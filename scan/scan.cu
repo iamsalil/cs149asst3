@@ -84,7 +84,6 @@ void exclusive_scan(int* input, int N, int* result)
     const int N2 = nextPow2(N);
     const int threadsPerBlock = 512;
     // Upsweep
-    printf("upsweep\n");
     int blocks = (N2 + threadsPerBlock - 1) / threadsPerBlock;
     for (int two_d = 1; two_d <= N2/2; two_d*=2) {
         int two_dplus1 = 2*two_d;
