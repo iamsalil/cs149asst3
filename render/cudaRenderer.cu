@@ -525,12 +525,14 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     if (blocks == 0)
         blocks = 1;
     gridDim = dim3(width, height, blocks);
-    gpuErrchk(kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr));
+    kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    cudaDeviceSynchronize();
     }
     // Mid
     blockDim = dim3(16, 16);
     gridDim = dim3((width +15)/16, (height + 15)/16);
-    gpuErrchk(kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr));
+    kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
+    cudaDeviceSynchronize();
     /// Downsweep
     blockDim = dim3(1, 1, 256);
     int effectiveLength = 1;
@@ -538,7 +540,8 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         int twoDPlus1 = 2*twoD;
     blocks = (effectiveLength + 255) / 256;
     gridDim = dim3(width, height, blocks);
-    gpuErrchk(kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr));
+    kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    cudaDeviceSynchronize();
     effectiveLength *= 2;
     }
 }
