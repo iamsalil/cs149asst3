@@ -29,7 +29,7 @@ private:
 
     int nCirclesNextPow2;
     int nWidthTiles;
-    int nWidthTiles;
+    int nHeightTiles;
     int* tileCircleIntersect;
     int* tileCircleUpdates;
     int* tileNumCircles;
