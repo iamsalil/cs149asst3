@@ -28,6 +28,8 @@ private:
     float* cudaDeviceImageData;
 
     int nCirclesNextPow2;
+    int myImageWidth;
+    int myImageHeight;
     int nWidthTiles;
     int nHeightTiles;
     int* tileCircleIntersect;

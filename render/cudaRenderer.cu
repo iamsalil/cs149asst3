@@ -651,7 +651,7 @@ CudaRenderer::getImage() {
 
     cudaMemcpy(image->data,
                cudaDeviceImageData,
-               sizeof(float) * 4 * image->width * image->height,
+               sizeof(float) * 4 * myImageWidth * myImageHeight,
                cudaMemcpyDeviceToHost);
 
     return image;
@@ -701,14 +701,14 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numCircles);
     cudaMalloc(&cudaDeviceColor, sizeof(float) * 3 * numCircles);
     cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles);
-    cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
+    cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * myImageWidth * myImageHeight);
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
-    printf("HELLO %d, %d, %p\n", image->width, image->height, image);
+    printf("HELLO %d, %d, %p\n", myImageWidth, myImageHeight, image);
     // cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
     // cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
     // cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
@@ -716,7 +716,7 @@ CudaRenderer::setup() {
     cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
     cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
     cudaMalloc(&tileNumCircles, sizeof(int) * 64);
-    printf("GOODBYE %d, %d, %p\n", image->width, image->height, image);
+    printf("GOODBYE %d, %d, %p\n", myImageWidth, myImageHeight, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -729,8 +729,8 @@ CudaRenderer::setup() {
     GlobalConstants params;
     params.sceneName = sceneName;
     params.numCircles = numCircles;
-    params.imageWidth = image->width;
-    params.imageHeight = image->height;
+    params.imageWidth = myImageWidth;
+    params.imageHeight = myImageHeight;
     params.position = cudaDevicePosition;
     params.velocity = cudaDeviceVelocity;
     params.color = cudaDeviceColor;
@@ -774,6 +774,8 @@ CudaRenderer::allocOutputImage(int width, int height) {
     if (image)
         delete image;
     image = new Image(width, height);
+    myImageWidth = width;
+    myImageHeight = height;
     nWidthTiles = (width + 15)/16;
     nHeightTiles = (height + 15)/16;
 }
@@ -788,8 +790,8 @@ CudaRenderer::clearImage() {
     // 256 threads per block is a healthy number
     dim3 blockDim(16, 16, 1);
     dim3 gridDim(
-        (image->width + blockDim.x - 1) / blockDim.x,
-        (image->height + blockDim.y - 1) / blockDim.y);
+        (myImageWidth + blockDim.x - 1) / blockDim.x,
+        (myImageHeight + blockDim.y - 1) / blockDim.y);
 
     if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
         kernelClearImageSnowflake<<<gridDim, blockDim>>>();
