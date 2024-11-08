@@ -16,8 +16,7 @@
 
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void
-gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
         fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
         if (abort)
@@ -438,6 +437,160 @@ __global__ void kernelRenderCircles() {
     }
 }
 
+  //////////////////
+ // MY FUNCTIONS //
+//////////////////
+static inline int nextPow2(int n) {
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
+#include "circleBoxTest.cu_inl"
+__global__ void
+kernelFindBlockCircleIntersections(int* blockCircleIntersect, int N) {
+    int width = cuConstRendererParams.imageWidth;
+    int height = cuConstRendererParams.imageHeight;
+
+    float blockL = static_cast<float>(blockIdx.x*16) / static_cast<float>(width);
+    float blockR = fminf(1.f, static_cast<float>((blockIdx.x+1)*16) / static_cast<float>(width));
+    float blockB = static_cast<float>(blockIdx.y*16) / static_cast<float>(height);
+    float blockT = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(height));
+
+    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = blockIndex * N;
+
+    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    int index3 = 3 * index;
+
+    if (index < cuConstRendererParams.numCircles) {
+        float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+        float rad = cuConstRendererParams.radius[index];
+    blockCircleIntersect[baseOffset + index] =
+        circleInBoxConservative(p.x, p.y, rad, blockL, blockR, blockT, blockB);
+    }
+}
+
+__global__ void
+kernelMultiExclusiveScanUpsweep(int N, int twoD, int twoDPlus1, int* arr) {
+    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = blockIndex * N;
+    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    if (index <= INT_MAX / twoDPlus1) {
+        int i = index*twoDPlus1;
+    if (i < N)
+            arr[baseOffset + i+twoDPlus1-1] += arr[baseOffset + i+twoD-1];
+    }
+}
+
+__global__ void
+kernelMultiExclusiveScanMidpoint(int N, int width, int height, int* arr) {
+    int blockX = blockIdx.x * blockDim.x + threadIdx.x;
+    int blockY = blockIdx.y * blockDim.y + threadIdx.y;
+    int blockIndex = blockY * width + blockX;
+    int baseOffset = blockIndex * N;
+    if ((blockX < width) && (blockY < height)) {
+        arr[baseOffset + N-1] = 0;
+    }
+}
+
+__global__ void
+kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
+    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = blockIndex * N;
+    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    if (index <= INT_MAX / twoDPlus1) { 
+        int i = index*twoDPlus1;
+        if (i < N) {
+            int t = arr[baseOffset + i+twoD-1];
+        arr[baseOffset + i+twoD-1] = arr[baseOffset + i+twoDPlus1-1];
+        arr[baseOffset + i+twoDPlus1-1] += t;
+        }
+    }
+}
+
+void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
+    dim3 blockDim(1, 1, 256);
+    dim3 gridDim;
+    // Upsweep
+    int blocks = (length + 255) / 256;
+    for (int twoD = 1; twoD <= length/2; twoD*=2) {
+        int twoDPlus1 = 2*twoD;
+    blocks /= 2;
+    if (blocks == 0)
+        blocks = 1;
+    gridDim = dim3(width, height, blocks);
+    kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    }
+    // Mid
+    blockDim = dim3(16, 16);
+    gridDim = dim3((width +15)/16, (height + 15)/16);
+    kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
+    /// Downsweep
+    blockDim = dim3(1, 1, 256);
+    int effectiveLength = 1;
+    for (int twoD = length/2; twoD >= 1; twoD /= 2) {
+        int twoDPlus1 = 2*twoD;
+    blocks = (effectiveLength + 255) / 256;
+    gridDim = dim3(width, height, blocks);
+    kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    effectiveLength *= 2;
+    }
+}
+
+__global__ void
+kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int actualN) {
+    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = blockIndex * N;
+    int stepLocOffset = blockIndex * actualN;
+    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    if (index < actualN-1) {
+        int current = steppingArr[baseOffset + index];
+    int next = steppingArr[baseOffset + index+1];
+    if (next == current+1) {
+            stepLocs[stepLocOffset+current] = index;
+        }
+    } else if (index == actualN - 1) {
+        numSteps[blockIndex] = steppingArr[baseOffset + index];
+    }
+}
+
+__global__ void
+kernelPixelUpdate(int* blockCircleUpdates, int* blockNumCircles) {
+    int width = cuConstRendererParams.imageWidth;
+    int height = cuConstRendererParams.imageHeight;
+    int numCircles = cuConstRendererParams.numCircles;
+
+    int imageX = blockIdx.x * blockDim.x + threadIdx.x;
+    int imageY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((imageX >= width) || (imageY >= height))
+        return;
+
+    int pixelIdx = imageY * cuConstRendererParams.imageWidth + imageX;
+    float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * pixelIdx]);
+    float2 pixelCenter = make_float2(
+            (0.5f + static_cast<float>(imageX)) / static_cast<float>(width),
+            (0.5f + static_cast<float>(imageY)) / static_cast<float>(height));
+
+    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = blockIndex * numCircles;
+
+    int circleIndex, circleIndex3;
+    float3 circlePosition;
+    for (int i = 0; i < blockNumCircles[blockIndex]; i++) {
+        circleIndex = blockCircleUpdates[baseOffset + i];
+    circleIndex3 = 3 * circleIndex;
+    circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
+    shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -543,6 +696,10 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
+
+    nCirclesNextPow2 = nextPow2(numCircles);
+    nWidthBlocks = (image->width + 15)/16;
+    nHeightBlocks = (image->height + 15)/16;
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
