@@ -454,7 +454,7 @@ static inline int nextPow2(int n) {
 #include "circleBoxTest.cu_inl"
 __global__ void
 kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
-    printf("> kernelFindTileCircleIntersections\n");
+    // printf("> kernelFindTileCircleIntersections\n");
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
@@ -469,14 +469,14 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int index3 = 3 * index;
 
-    printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.y, blockIdx.z, index);
+    // printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.y, blockIdx.z, index);
 
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
         int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
         if (inTile == 1)
-            printf("  > circle %d hits in %d\n", index, tileIndex);
+            printf("> circle %d hits in %d\n", index, tileIndex);
         tileCircleIntersect[baseOffset + index] = inTile;
     }
 }
