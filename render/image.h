@@ -11,13 +11,11 @@ struct Image {
         data = new float[4 * width * height];
     }
 
-    /*
     ~Image() {
         printf("> image deconstructor\n");
         delete[] data;
         printf("> success!\n");
     }
-    */
 
     void clear(float r, float g, float b, float a) {
 
