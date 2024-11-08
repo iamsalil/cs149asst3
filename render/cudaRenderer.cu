@@ -709,13 +709,13 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
     printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
-    // cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
-    // cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
-    // cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
+    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
+    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
+    cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
 
-    cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
-    cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
-    cudaMalloc(&tileNumCircles, sizeof(int) * 64);
+    // cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
+    // cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
+    // cudaMalloc(&tileNumCircles, sizeof(int) * 64);
     printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
