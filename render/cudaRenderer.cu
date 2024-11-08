@@ -881,7 +881,7 @@ CudaRenderer::render() {
     printf("> step 1\n");
     blockDim = dim3(1, 1, 256);
     gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
-    gpuErrchk(kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2));
+    kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
     cudaDeviceSynchronize();
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
@@ -893,14 +893,14 @@ CudaRenderer::render() {
     printf("> step 2.2\n");
     blockDim = dim3(1, 1, 256);
     gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
-    gpuErrchk(kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
-         tileNumCircles, nCirclesNextPow2, numCircles));
+    kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
+         tileNumCircles, nCirclesNextPow2, numCircles);
     cudaDeviceSynchronize();
 
     // Update pixels
     printf("> step 3\n");
     blockDim = dim3(16, 16);
     gridDim = dim3(nWidthTiles, nHeightTiles);
-    gpuErrchk(kernelPixelUpdate<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles));
+    kernelPixelUpdate<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
     cudaDeviceSynchronize();
 }
