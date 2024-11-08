@@ -28,8 +28,11 @@ private:
     float* cudaDeviceImageData;
 
     int nCirclesNextPow2;
-    int nWidthBlocks;
-    int nHeightBlocks;
+    int nWidthTiles;
+    int nWidthTiles;
+    int* tileCircleIntersect
+    int* tileCircleUpdates
+    int* tileNumCircles
 
 public:
 

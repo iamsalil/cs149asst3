@@ -609,6 +609,10 @@ CudaRenderer::CudaRenderer() {
     cudaDeviceColor = NULL;
     cudaDeviceRadius = NULL;
     cudaDeviceImageData = NULL;
+
+    tileCircleIntersect = NULL;
+    tileCircleUpdates = NULL;
+    tileNumCircles = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -630,6 +634,10 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaDeviceColor);
         cudaFree(cudaDeviceRadius);
         cudaFree(cudaDeviceImageData);
+
+        cudaFree(tileCircleIntersect);
+        cudaFree(tileCircleUpdates);
+        cudaFree(tileNumCircles);
     }
 }
 
@@ -651,9 +659,11 @@ CudaRenderer::getImage() {
 
 void
 CudaRenderer::loadScene(SceneName scene) {
+    printf("%d\n", numCircles);
     printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
+    printf("%d\n", numCircles);
 }
 
 void
@@ -698,8 +708,11 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
     nCirclesNextPow2 = nextPow2(numCircles);
-    nWidthBlocks = (image->width + 15)/16;
-    nHeightBlocks = (image->height + 15)/16;
+    printf("HELLO %d, %d, %p\n", image->width, image->height, image);
+    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
+    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
+    cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
+    printf("GOODBYE %d, %d, %p\n", image->width, image->height, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -757,6 +770,8 @@ CudaRenderer::allocOutputImage(int width, int height) {
     if (image)
         delete image;
     image = new Image(width, height);
+    nWidthTiles = (width + 15)/16;
+    nHeightTiles = (height + 15)/16;
 }
 
 // clearImage --
