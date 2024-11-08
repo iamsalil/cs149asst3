@@ -30,7 +30,6 @@ private:
     int nCirclesNextPow2;
     int myImageWidth;
     int myImageHeight;
-    float* myImageData;
     int nWidthTiles;
     int nHeightTiles;
     int* tileCircleIntersect;

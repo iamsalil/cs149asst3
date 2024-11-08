@@ -453,7 +453,7 @@ static inline int nextPow2(int n) {
 
 #include "circleBoxTest.cu_inl"
 __global__ void
-kernelFindBlockCircleIntersections(int* blockCircleIntersect, int N) {
+kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
@@ -471,7 +471,7 @@ kernelFindBlockCircleIntersections(int* blockCircleIntersect, int N) {
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
-    blockCircleIntersect[baseOffset + index] =
+    tileCircleIntersect[baseOffset + index] =
         circleInBoxConservative(p.x, p.y, rad, blockL, blockR, blockT, blockB);
     }
 }
@@ -525,12 +525,12 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     if (blocks == 0)
         blocks = 1;
     gridDim = dim3(width, height, blocks);
-    kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    gpuErrchk(kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr));
     }
     // Mid
     blockDim = dim3(16, 16);
     gridDim = dim3((width +15)/16, (height + 15)/16);
-    kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
+    gpuErrchk(kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr));
     /// Downsweep
     blockDim = dim3(1, 1, 256);
     int effectiveLength = 1;
@@ -538,7 +538,7 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         int twoDPlus1 = 2*twoD;
     blocks = (effectiveLength + 255) / 256;
     gridDim = dim3(width, height, blocks);
-    kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+    gpuErrchk(kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr));
     effectiveLength *= 2;
     }
 }
@@ -561,7 +561,7 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
 }
 
 __global__ void
-kernelPixelUpdate(int* blockCircleUpdates, int* blockNumCircles) {
+kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
     int numCircles = cuConstRendererParams.numCircles;
@@ -583,8 +583,8 @@ kernelPixelUpdate(int* blockCircleUpdates, int* blockNumCircles) {
 
     int circleIndex, circleIndex3;
     float3 circlePosition;
-    for (int i = 0; i < blockNumCircles[blockIndex]; i++) {
-        circleIndex = blockCircleUpdates[baseOffset + i];
+    for (int i = 0; i < tileNumCircles[blockIndex]; i++) {
+        circleIndex = tileCircleUpdates[baseOffset + i];
     circleIndex3 = 3 * circleIndex;
     circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
     shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
@@ -612,7 +612,7 @@ CudaRenderer::CudaRenderer() {
 
     tileCircleIntersect = NULL;
     tileCircleUpdates = NULL;
-    tileNumCircles = NULL;
+    tileNumCircless = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -646,7 +646,7 @@ CudaRenderer::~CudaRenderer() {
         cudaDeviceSynchronize();
         gpuErrchk(cudaFree(tileCircleUpdates));
         cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(tileNumCircles));
+        gpuErrchk(cudaFree(tileNumCircless));
         cudaDeviceSynchronize();
     }
 }
@@ -732,14 +732,14 @@ CudaRenderer::setup() {
     cudaDeviceSynchronize();
     gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
     cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles));
+    gpuErrchk(cudaMalloc(&tileNumCircless, sizeof(int) * nWidthTiles * nHeightTiles));
     cudaDeviceSynchronize();
 
     // gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * 64));
     // cudaDeviceSynchronize();
     // gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * 64));
     // cudaDeviceSynchronize();
-    // gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * 64));
+    // gpuErrchk(cudaMalloc(&tileNumCircless, sizeof(int) * 64));
     // cudaDeviceSynchronize();
     printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
@@ -854,6 +854,7 @@ CudaRenderer::advanceAnimation() {
     cudaDeviceSynchronize();
 }
 
+/*
 void
 CudaRenderer::render() {
     printf("Rendering image\n");
@@ -863,4 +864,40 @@ CudaRenderer::render() {
 
     kernelRenderCircles<<<gridDim, blockDim>>>();
     cudaDeviceSynchronize();
+}
+*/
+
+void
+CudaRenderer::render() {
+    printf("cuda render (W=%d, H=%d, C=%d)\n", myImageWidth, myImageHeight, numCircles);
+    printf("nWidthTiles=%d, nHeightTiles=%d\n", nWidthTiles, nHeightTiles);
+    dim3 blockDim;
+    dim3 gridDim;
+
+    // Tile x Circle intersection
+    printf("step 1\n");
+    blockDim = dim3(1, 1, 256);
+    gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    // gpuErrchk(kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2));
+    // cudaDeviceSynchronize();
+
+    // Order circles that intersect each tile (Part1 - Exclusive Scan)
+    printf("step 2.1\n");
+    // multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
+    // cudaDeviceSynchronize();
+
+    // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
+    printf("step 2.2\n");
+    blockDim = dim3(1, 1, 256);
+    gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    // gpuErrchk(kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
+            tileNumCircles, nCirclesNextPow2, numCircles));
+    // cudaDeviceSynchronize();
+
+    // Update pixels
+    printf("step 3\n");
+    blockDim = dim3(16, 16);
+    gridDim = dim3(nWidthTiles, nHeightTiles);
+    // gpuErrchk(kernelPixelUpdate<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles));
+    // cudaDeviceSynchronize();
 }
