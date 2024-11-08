@@ -710,6 +710,8 @@ CudaRenderer::setup() {
         printf("   SMs:        %d\n", deviceProps.multiProcessorCount);
         printf("   Global mem: %.0f MB\n", static_cast<float>(deviceProps.totalGlobalMem) / (1024 * 1024));
         printf("   CUDA Cap:   %d.%d\n", deviceProps.major, deviceProps.minor);
+        printf("   Max threads per block:   %d\n", deviceProps.maxThreadsPerBlock);
+        printf("   Max grid size:   (%d, %d, %d)\n", deviceProps.maxGridSize[0], deviceProps.maxGridSize[1], deviceProps.maxGridSize[2]);
     }
     printf("---------------------------------------------------------\n");
     
