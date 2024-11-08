@@ -5,9 +5,15 @@
 struct Image {
 
     Image(int w, int h) {
+        printf("> image constructor\n");
         width = w;
         height = h;
         data = new float[4 * width * height];
+    }
+
+    ~Image() {
+        printf("> image deconstructor\n");
+        delete[] data;
     }
 
     void clear(float r, float g, float b, float a) {

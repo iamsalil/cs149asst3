@@ -14,6 +14,17 @@
 #include "sceneLoader.h"
 #include "util.h"
 
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void
+gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort)
+            exit(code);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // Putting all the cuda kernels here
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -431,6 +442,7 @@ __global__ void kernelRenderCircles() {
 
 
 CudaRenderer::CudaRenderer() {
+    printf("Constructing renderer\n");
     image = NULL;
 
     numCircles = 0;
@@ -447,7 +459,7 @@ CudaRenderer::CudaRenderer() {
 }
 
 CudaRenderer::~CudaRenderer() {
-
+    printf("Deconstructing renderer\n");
     if (image) {
         delete image;
     }
@@ -470,7 +482,7 @@ CudaRenderer::~CudaRenderer() {
 
 const Image*
 CudaRenderer::getImage() {
-
+    printf("Get image pointer\n");
     // need to copy contents of the rendered image from device memory
     // before we expose the Image object to the caller
 
@@ -486,13 +498,14 @@ CudaRenderer::getImage() {
 
 void
 CudaRenderer::loadScene(SceneName scene) {
+    printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
 }
 
 void
 CudaRenderer::setup() {
-
+    printf("Setting up\n");
     int deviceCount = 0;
     std::string name;
     cudaError_t err = cudaGetDeviceCount(&deviceCount);
@@ -583,7 +596,7 @@ CudaRenderer::setup() {
 // image first to avoid memory leak.
 void
 CudaRenderer::allocOutputImage(int width, int height) {
-
+    printf("Allocating image\n");
     if (image)
         delete image;
     image = new Image(width, height);
@@ -595,7 +608,7 @@ CudaRenderer::allocOutputImage(int width, int height) {
 // the clear depends on the scene being rendered.
 void
 CudaRenderer::clearImage() {
-
+    printf("Clearing image\n");
     // 256 threads per block is a healthy number
     dim3 blockDim(16, 16, 1);
     dim3 gridDim(
@@ -616,7 +629,8 @@ CudaRenderer::clearImage() {
 // and velocities
 void
 CudaRenderer::advanceAnimation() {
-     // 256 threads per block is a healthy number
+    printf("Advancing animation\n");
+    // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
 
@@ -635,7 +649,7 @@ CudaRenderer::advanceAnimation() {
 
 void
 CudaRenderer::render() {
-
+    printf("Rendering image\n");
     // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
