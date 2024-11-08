@@ -14,6 +14,7 @@ struct Image {
     ~Image() {
         printf("> image deconstructor\n");
         delete[] data;
+	printf("> success!\n");
     }
 
     void clear(float r, float g, float b, float a) {

@@ -728,16 +728,19 @@ CudaRenderer::setup() {
     cudaDeviceSynchronize();
 
     printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
-    gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles));
-    cudaDeviceSynchronize();
+    // gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2));
+    // cudaDeviceSynchronize();
+    // gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
+    // cudaDeviceSynchronize();
+    // gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles));
+    // cudaDeviceSynchronize();
 
-    // cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
-    // cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
-    // cudaMalloc(&tileNumCircles, sizeof(int) * 64);
+    gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * 64));
+    cudaDeviceSynchronize();
+    gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * 64));
+    cudaDeviceSynchronize();
+    gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * 64));
+    cudaDeviceSynchronize();
     printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
