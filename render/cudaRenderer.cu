@@ -472,10 +472,9 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
         int inTile = circleInBoxConservative(p.x, p.y, rad, blockL, blockR, blockT, blockB);
-        if (inTile == 1) {
+        if (inTile == 1)
             printf("circle %d hits in %d\n", index, blockIndex);
-            tileCircleIntersect[baseOffset + index] = ;
-        }
+        tileCircleIntersect[baseOffset + index] = inTile;
     }
 }
 
