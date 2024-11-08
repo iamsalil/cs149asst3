@@ -892,7 +892,15 @@ CudaRenderer::render() {
     blockDim = dim3(1, 1, 256);
     gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
+    }
     cudaDeviceSynchronize();
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error after sync: %s\n", cudaGetErrorString(err));
+    }
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
     printf("> step 2.1\n");
