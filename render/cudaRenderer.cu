@@ -649,7 +649,7 @@ CudaRenderer::getImage() {
 
     printf("Copying image data from device\n");
 
-    cudaMemcpy(image->data,
+    cudaMemcpy(myImageData,
                cudaDeviceImageData,
                sizeof(float) * 4 * myImageWidth * myImageHeight,
                cudaMemcpyDeviceToHost);
@@ -708,7 +708,7 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
-    printf("HELLO %d, %d, %p, %p\n", myImageWidth, myImageHeight, image->data, image);
+    printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
     // cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
     // cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
     // cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
@@ -716,7 +716,7 @@ CudaRenderer::setup() {
     cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
     cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
     cudaMalloc(&tileNumCircles, sizeof(int) * 64);
-    printf("GOODBYE %d, %d, %p, %p\n", myImageWidth, myImageHeight, image->data, image);
+    printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
