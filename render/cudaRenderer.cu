@@ -663,6 +663,7 @@ CudaRenderer::loadScene(SceneName scene) {
     printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
+    nCirclesNextPow2 = nextPow2(numCircles);
     printf("%d\n", numCircles);
 }
 
@@ -707,11 +708,14 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
-    nCirclesNextPow2 = nextPow2(numCircles);
     printf("HELLO %d, %d, %p\n", image->width, image->height, image);
-    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
-    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
-    cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
+    // cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
+    // cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
+    // cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
+
+    cudaMalloc(&tileCircleIntersect, sizeof(int) * 64);
+    cudaMalloc(&tileCircleUpdates, sizeof(int) * 64);
+    cudaMalloc(&tileNumCircles, sizeof(int) * 64);
     printf("GOODBYE %d, %d, %p\n", image->width, image->height, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
