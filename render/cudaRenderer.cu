@@ -458,18 +458,18 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
-    float tileL = static_cast<float>(blockIdx.x*16) / static_cast<float>(width);
-    float tileR = fminf(1.f, static_cast<float>((blockIdx.x+1)*16) / static_cast<float>(width));
-    float tileB = static_cast<float>(blockIdx.y*16) / static_cast<float>(height);
-    float tileT = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(height));
+    float tileL = static_cast<float>(blockIdx.y*16) / static_cast<float>(width);
+    float tileR = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(width));
+    float tileB = static_cast<float>(blockIdx.z*16) / static_cast<float>(height);
+    float tileT = fminf(1.f, static_cast<float>((blockIdx.z+1)*16) / static_cast<float>(height));
 
-    int tileIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * N;
 
-    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
     int index3 = 3 * index;
 
-    printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.x, blockIdx.y, index);
+    printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.y, blockIdx.z, index);
 
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
@@ -891,8 +891,10 @@ CudaRenderer::render() {
 
     // Tile x Circle intersection
     printf("> step 1\n");
-    blockDim = dim3(1, 1, 256);
-    gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    // blockDim = dim3(1, 1, 256);
+    // gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    blockDim = dim3(256, 1, 1);
+    gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
     printf("Grid : (%d, %d, %d) blocks. Blocks : (%d, %d, %d) threads.\n", gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z);
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
     cudaError_t err = cudaGetLastError();
