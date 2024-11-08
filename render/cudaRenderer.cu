@@ -891,6 +891,7 @@ CudaRenderer::render() {
     printf("> step 1\n");
     blockDim = dim3(1, 1, 256);
     gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    printf("Grid : (%d, %d, %d) blocks. Blocks : (%d, %d, %d) threads.\n", gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z);
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
