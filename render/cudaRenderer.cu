@@ -629,12 +629,14 @@ CudaRenderer::~CudaRenderer() {
     }
 
     if (cudaDevicePosition) {
+        printf("freeing 1\n");
         cudaFree(cudaDevicePosition);
         cudaFree(cudaDeviceVelocity);
         cudaFree(cudaDeviceColor);
         cudaFree(cudaDeviceRadius);
         cudaFree(cudaDeviceImageData);
 
+	printf("freeing 2\n");
         cudaFree(tileCircleIntersect);
         cudaFree(tileCircleUpdates);
         cudaFree(tileNumCircles);
@@ -649,7 +651,7 @@ CudaRenderer::getImage() {
 
     printf("Copying image data from device\n");
 
-    cudaMemcpy(myImageData,
+    cudaMemcpy(image->data,
                cudaDeviceImageData,
                sizeof(float) * 4 * myImageWidth * myImageHeight,
                cudaMemcpyDeviceToHost);
