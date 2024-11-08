@@ -468,10 +468,11 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int index = blockIdx.z * blockDim.z + threadIdx.z;
     int index3 = 3 * index;
 
+    printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.x, blockIdx.y, index);
+
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
-        printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.x, blockIdx.y, index);
         int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
         if (inTile == 1)
             printf("  > circle %d hits in %d\n", index, tileIndex);
