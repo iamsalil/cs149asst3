@@ -457,13 +457,13 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
-    float blockL = static_cast<float>(blockIdx.x*16) / static_cast<float>(width);
-    float blockR = fminf(1.f, static_cast<float>((blockIdx.x+1)*16) / static_cast<float>(width));
-    float blockB = static_cast<float>(blockIdx.y*16) / static_cast<float>(height);
-    float blockT = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(height));
+    float tileL = static_cast<float>(blockIdx.x*16) / static_cast<float>(width);
+    float tileR = fminf(1.f, static_cast<float>((blockIdx.x+1)*16) / static_cast<float>(width));
+    float tileB = static_cast<float>(blockIdx.y*16) / static_cast<float>(height);
+    float tileT = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(height));
 
-    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
-    int baseOffset = blockIndex * N;
+    int tileIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = tileIndex * N;
 
     int index = blockIdx.z * blockDim.z + threadIdx.z;
     int index3 = 3 * index;
@@ -471,9 +471,10 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
-        int inTile = circleInBoxConservative(p.x, p.y, rad, blockL, blockR, blockT, blockB);
+        printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.x, blockIdx.y, index);
+        int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
         if (inTile == 1)
-            printf("circle %d hits in %d\n", index, blockIndex);
+            printf("  > circle %d hits in %d\n", index, tileIndex);
         tileCircleIntersect[baseOffset + index] = inTile;
     }
 }
