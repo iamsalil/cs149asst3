@@ -454,7 +454,6 @@ static inline int nextPow2(int n) {
 #include "circleBoxTest.cu_inl"
 __global__ void
 kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
-    // printf("> kernelFindTileCircleIntersections\n");
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
@@ -469,23 +468,21 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int index3 = 3 * index;
 
-    // printf("> checking if tile (%d, %d) hits circle %d...", blockIdx.y, blockIdx.z, index);
-
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
         int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
         if (inTile == 1)
-            printf("> circle %d hits in %d\n", index, tileIndex);
+            printf("  > circle %d hits in %d\n", index, tileIndex);
         tileCircleIntersect[baseOffset + index] = inTile;
     }
 }
 
 __global__ void
 kernelMultiExclusiveScanUpsweep(int N, int twoD, int twoDPlus1, int* arr) {
-    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int blockIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = blockIndex * N;
-    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index <= INT_MAX / twoDPlus1) {
         int i = index*twoDPlus1;
         if (i < N)
@@ -506,9 +503,9 @@ kernelMultiExclusiveScanMidpoint(int N, int width, int height, int* arr) {
 
 __global__ void
 kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
-    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int blockIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = blockIndex * N;
-    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index <= INT_MAX / twoDPlus1) { 
         int i = index*twoDPlus1;
         if (i < N) {
@@ -520,45 +517,46 @@ kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
 }
 
 void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
-    printf("> multiExclusiveScan\n");
-    dim3 blockDim(1, 1, 256);
+    dim3 blockDim(256, 1, 1);
     dim3 gridDim;
     // Upsweep
+    printf("  > upsweep\n");
     int blocks = (length + 255) / 256;
     for (int twoD = 1; twoD <= length/2; twoD*=2) {
         int twoDPlus1 = 2*twoD;
-    blocks /= 2;
-    if (blocks == 0)
-        blocks = 1;
-    gridDim = dim3(width, height, blocks);
-    kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
-    cudaDeviceSynchronize();
+        blocks /= 2;
+        if (blocks == 0)
+            blocks = 1;
+        gridDim = dim3(blocks, width, height);
+        kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+        cudaDeviceSynchronize();
     }
     // Mid
+    printf("  > midstep\n");
     blockDim = dim3(16, 16);
     gridDim = dim3((width +15)/16, (height + 15)/16);
     kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
     cudaDeviceSynchronize();
     /// Downsweep
-    blockDim = dim3(1, 1, 256);
+    printf("  > downsweep\n");
+    blockDim = dim3(256, 1, 1);
     int effectiveLength = 1;
     for (int twoD = length/2; twoD >= 1; twoD /= 2) {
         int twoDPlus1 = 2*twoD;
-    blocks = (effectiveLength + 255) / 256;
-    gridDim = dim3(width, height, blocks);
-    kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
-    cudaDeviceSynchronize();
-    effectiveLength *= 2;
+        blocks = (effectiveLength + 255) / 256;
+        gridDim = dim3(blocks, width, height);
+        kernelMultiExclusiveScanDownsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
+        cudaDeviceSynchronize();
+        effectiveLength *= 2;
     }
 }
 
 __global__ void
 kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int actualN) {
-    printf("> kernelMultiFindStepLocs\n");
-    int tileIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * N;
     int stepLocOffset = tileIndex * actualN;
-    int index = blockIdx.z * blockDim.z + threadIdx.z;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index < actualN-1) {
         int current = steppingArr[baseOffset + index];
         int next = steppingArr[baseOffset + index+1];
@@ -914,8 +912,8 @@ CudaRenderer::render() {
 
     // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
     printf("> step 2.2\n");
-    blockDim = dim3(1, 1, 256);
-    gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
+    blockDim = dim3(256, 1, 1);
+    gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
     kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
          tileNumCircles, nCirclesNextPow2, numCircles);
     cudaDeviceSynchronize();
