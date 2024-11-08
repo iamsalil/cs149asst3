@@ -584,23 +584,23 @@ kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
     if ((imageX >= width) || (imageY >= height))
         return;
 
-    printf("> kernelPixelUpdate\n");
     int pixelIdx = imageY * cuConstRendererParams.imageWidth + imageX;
     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * pixelIdx]);
     float2 pixelCenter = make_float2(
             (0.5f + static_cast<float>(imageX)) / static_cast<float>(width),
             (0.5f + static_cast<float>(imageY)) / static_cast<float>(height));
 
-    int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
-    int baseOffset = blockIndex * numCircles;
+    int tileIdx = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = tileIdx * numCircles;
 
     int circleIndex, circleIndex3;
     float3 circlePosition;
-    for (int i = 0; i < tileNumCircles[blockIndex]; i++) {
+    for (int i = 0; i < tileNumCircles[tileIdx]; i++) {
         circleIndex = tileCircleUpdates[baseOffset + i];
-    circleIndex3 = 3 * circleIndex;
-    circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
-    shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
+        // printf("> pixel %d being updated by circle %d\n", pixelIdx, circleIndex);
+        circleIndex3 = 3 * circleIndex;
+        circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
+        shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
     }
 }
 
