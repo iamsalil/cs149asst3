@@ -30,9 +30,9 @@ private:
     int nCirclesNextPow2;
     int nWidthTiles;
     int nWidthTiles;
-    int* tileCircleIntersect
-    int* tileCircleUpdates
-    int* tileNumCircles
+    int* tileCircleIntersect;
+    int* tileCircleUpdates;
+    int* tileNumCircles;
 
 public:
 
