@@ -615,7 +615,7 @@ CudaRenderer::CudaRenderer() {
 
     tileCircleIntersect = NULL;
     tileCircleUpdates = NULL;
-    tileNumCircless = NULL;
+    tileNumCircles = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -649,7 +649,7 @@ CudaRenderer::~CudaRenderer() {
         cudaDeviceSynchronize();
         gpuErrchk(cudaFree(tileCircleUpdates));
         cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(tileNumCircless));
+        gpuErrchk(cudaFree(tileNumCircles));
         cudaDeviceSynchronize();
     }
 }
@@ -735,14 +735,14 @@ CudaRenderer::setup() {
     cudaDeviceSynchronize();
     gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
     cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileNumCircless, sizeof(int) * nWidthTiles * nHeightTiles));
+    gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles));
     cudaDeviceSynchronize();
 
     // gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * 64));
     // cudaDeviceSynchronize();
     // gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * 64));
     // cudaDeviceSynchronize();
-    // gpuErrchk(cudaMalloc(&tileNumCircless, sizeof(int) * 64));
+    // gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * 64));
     // cudaDeviceSynchronize();
     printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
@@ -894,7 +894,7 @@ CudaRenderer::render() {
     blockDim = dim3(1, 1, 256);
     gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
     // gpuErrchk(kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
-            tileNumCircles, nCirclesNextPow2, numCircles));
+    //         tileNumCircles, nCirclesNextPow2, numCircles));
     // cudaDeviceSynchronize();
 
     // Update pixels
