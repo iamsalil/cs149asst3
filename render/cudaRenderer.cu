@@ -454,6 +454,7 @@ static inline int nextPow2(int n) {
 #include "circleBoxTest.cu_inl"
 __global__ void
 kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
+    printf("kernelFindTileCircleIntersections");
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
@@ -482,6 +483,7 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
 
 __global__ void
 kernelMultiExclusiveScanUpsweep(int N, int twoD, int twoDPlus1, int* arr) {
+    printf("kernelMultiExclusiveScanUpsweep");
     int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
     int baseOffset = blockIndex * N;
     int index = blockIdx.z * blockDim.z + threadIdx.z;
@@ -494,6 +496,7 @@ kernelMultiExclusiveScanUpsweep(int N, int twoD, int twoDPlus1, int* arr) {
 
 __global__ void
 kernelMultiExclusiveScanMidpoint(int N, int width, int height, int* arr) {
+    printf("kernelMultiExclusiveScanMidpoint");
     int blockX = blockIdx.x * blockDim.x + threadIdx.x;
     int blockY = blockIdx.y * blockDim.y + threadIdx.y;
     int blockIndex = blockY * width + blockX;
@@ -505,6 +508,7 @@ kernelMultiExclusiveScanMidpoint(int N, int width, int height, int* arr) {
 
 __global__ void
 kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
+    printf("kernelMultiExclusiveScanDownsweep");
     int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
     int baseOffset = blockIndex * N;
     int index = blockIdx.z * blockDim.z + threadIdx.z;
@@ -519,6 +523,7 @@ kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
 }
 
 void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
+    printf("multiExclusiveScan");
     dim3 blockDim(1, 1, 256);
     dim3 gridDim;
     // Upsweep
@@ -552,6 +557,7 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
 
 __global__ void
 kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int actualN) {
+    printf("kernelMultiFindStepLocs");
     int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
     int baseOffset = blockIndex * N;
     int stepLocOffset = blockIndex * actualN;
@@ -569,6 +575,7 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
 
 __global__ void
 kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
+    printf("kernelPixelUpdate");
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
     int numCircles = cuConstRendererParams.numCircles;
