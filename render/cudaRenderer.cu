@@ -676,7 +676,7 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
 void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length) {
-    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
     thrust::device_ptr<int> d_ptr(deviceArr);
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -684,7 +684,7 @@ void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length)
             d_ptr += length;
         }
     }
-    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
 
 __global__ void
