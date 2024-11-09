@@ -472,10 +472,19 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
         int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
-        if (inTile == 1)
+        if ((inTile == 1) && (tileIndex == 2080))
             printf("  > circle %d hits in %d\n", index, tileIndex);
         tileCircleIntersect[baseOffset + index] = inTile;
     }
+}
+
+__global__ void
+kernelPrintArr(int* arr, int idx, int N) {
+    printf("  > [");
+    for (int i = 0; i < N; i++) {
+        printf("%d ", arr[idx*N+i]);
+    }
+    printf("]\n");
 }
 
 __global__ void
@@ -517,6 +526,8 @@ kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
 }
 
 void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+
     dim3 blockDim(256, 1, 1);
     dim3 gridDim;
     // Upsweep
@@ -549,6 +560,8 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         cudaDeviceSynchronize();
         effectiveLength *= 2;
     }
+
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
 
 __global__ void
@@ -561,11 +574,11 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
         int current = steppingArr[baseOffset + index];
         int next = steppingArr[baseOffset + index+1];
         if (next == current+1) {
-            printf("  > found that tile %d intersected circle %d\n", tileIndex, index);
+            // printf("  > found that tile %d intersected circle %d\n", tileIndex, index);
             stepLocs[stepLocOffset+current] = index;
         }
     } else if (index == actualN - 1) {
-        printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
+        // printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
         numSteps[tileIndex] = steppingArr[baseOffset + index];
     }
 }
