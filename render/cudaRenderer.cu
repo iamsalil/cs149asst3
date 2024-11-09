@@ -983,29 +983,43 @@ CudaRenderer::render() {
 }
 */
 
+#include "cycleTimer.h"
 void
 CudaRenderer::render() {
+    double startTime;
+    double endTime;
+
     dim3 blockDim;
     dim3 gridDim;
 
     // Tile x Circle intersection
+    startTime = CycleTimer::currentSeconds();
     blockDim = dim3(256, 1, 1);
     gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
     cudaDeviceSynchronize();
+    endTime = CycleTimer::currentSeconds();
+    printf("time: %f\n", endTime - startTime);
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
+    startTime = CycleTimer::currentSeconds();
     multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
     cudaDeviceSynchronize();
+    endTime = CycleTimer::currentSeconds();
+    printf("time: %f\n", endTime - startTime);
 
     // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
+    startTime = CycleTimer::currentSeconds();
     blockDim = dim3(256, 1, 1);
     gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
     kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
          tileNumCircles, nCirclesNextPow2, numCircles);
     cudaDeviceSynchronize();
+    endTime = CycleTimer::currentSeconds();
+    printf("time: %f\n", endTime - startTime);
 
     // Update pixels
+    startTime = CycleTimer::currentSeconds();
     blockDim = dim3(16, 16);
     gridDim = dim3(nWidthTiles, nHeightTiles);
     if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
@@ -1014,4 +1028,6 @@ CudaRenderer::render() {
         kernelPixelUpdateNotSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
     }
     cudaDeviceSynchronize();
+    endTime = CycleTimer::currentSeconds();
+    printf("time: %f\n", endTime - startTime);
 }
