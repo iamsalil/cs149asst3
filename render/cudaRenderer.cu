@@ -18,7 +18,7 @@
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
-        f// printf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
         if (abort)
             exit(code);
     }
@@ -471,20 +471,17 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     if (index < cuConstRendererParams.numCircles) {
         float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         float rad = cuConstRendererParams.radius[index];
-        int inTile = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
-        if ((inTile == 1) && (tileIndex == 2080))
-            // printf("  > circle %d hits in %d\n", index, tileIndex);
-        tileCircleIntersect[baseOffset + index] = inTile;
+        tileCircleIntersect[baseOffset + index] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
     }
 }
 
 __global__ void
 kernelPrintArr(int* arr, int idx, int N) {
-    // printf("  > [");
+    printf("  > [");
     for (int i = 0; i < N; i++) {
-        // printf("%d ", arr[idx*N+i]);
+        printf("%d ", arr[idx*N+i]);
     }
-    // printf("]\n");
+    printf("]\n");
 }
 
 __global__ void
@@ -531,7 +528,6 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     dim3 blockDim(256, 1, 1);
     dim3 gridDim;
     // Upsweep
-    // printf("  > upsweep\n");
     int blocks = (length + 255) / 256;
     for (int twoD = 1; twoD <= length/2; twoD*=2) {
         int twoDPlus1 = 2*twoD;
@@ -543,13 +539,11 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         cudaDeviceSynchronize();
     }
     // Mid
-    // printf("  > midstep\n");
     blockDim = dim3(16, 16);
     gridDim = dim3((width +15)/16, (height + 15)/16);
     kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
     cudaDeviceSynchronize();
     /// Downsweep
-    // printf("  > downsweep\n");
     blockDim = dim3(256, 1, 1);
     int effectiveLength = 1;
     for (int twoD = length/2; twoD >= 1; twoD /= 2) {
@@ -574,13 +568,9 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
         int current = steppingArr[baseOffset + index];
         int next = steppingArr[baseOffset + index+1];
         if (next == current+1) {
-            // // printf("  > found that tile %d intersected circle %d\n", tileIndex, index);
             stepLocs[stepLocOffset+current] = index;
         }
     } else if (index == actualN) {
-        if (tileIndex == 2080) {
-            // printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
-        }
         numSteps[tileIndex] = steppingArr[baseOffset + index];
     }
 }
@@ -610,7 +600,6 @@ kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
     float3 circlePosition;
     for (int i = 0; i < tileNumCircles[tileIdx]; i++) {
         circleIndex = tileCircleUpdates[baseOffset + i];
-        // // printf("> pixel %d being updated by circle %d\n", pixelIdx, circleIndex);
         circleIndex3 = 3 * circleIndex;
         circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
         shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
@@ -621,7 +610,7 @@ kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
 
 
 CudaRenderer::CudaRenderer() {
-    // printf("Constructing renderer\n");
+    printf("Constructing renderer\n");
     image = NULL;
 
     numCircles = 0;
@@ -642,7 +631,7 @@ CudaRenderer::CudaRenderer() {
 }
 
 CudaRenderer::~CudaRenderer() {
-    // printf("Deconstructing renderer\n");
+    printf("Deconstructing renderer\n");
     if (image) {
         delete image;
     }
@@ -655,7 +644,7 @@ CudaRenderer::~CudaRenderer() {
     }
 
     if (cudaDevicePosition) {
-        // printf("freeing 1\n");
+        printf("freeing 1\n");
         gpuErrchk(cudaFree(cudaDevicePosition));
         cudaDeviceSynchronize();
         gpuErrchk(cudaFree(cudaDeviceVelocity));
@@ -667,7 +656,7 @@ CudaRenderer::~CudaRenderer() {
         gpuErrchk(cudaFree(cudaDeviceImageData));
         cudaDeviceSynchronize();
 
-        // printf("freeing 2\n");
+        printf("freeing 2\n");
         gpuErrchk(cudaFree(tileCircleIntersect));
         cudaDeviceSynchronize();
         gpuErrchk(cudaFree(tileCircleUpdates));
@@ -679,11 +668,11 @@ CudaRenderer::~CudaRenderer() {
 
 const Image*
 CudaRenderer::getImage() {
-    // printf("Get image pointer\n");
+    printf("Get image pointer\n");
     // need to copy contents of the rendered image from device memory
     // before we expose the Image object to the caller
 
-    // printf("Copying image data from device\n");
+    printf("Copying image data from device\n");
 
     gpuErrchk(cudaMemcpy(image->data,
                cudaDeviceImageData,
@@ -695,38 +684,38 @@ CudaRenderer::getImage() {
 
 void
 CudaRenderer::loadScene(SceneName scene) {
-    // printf("%d\n", numCircles);
-    // printf("Load scene\n");
+    printf("%d\n", numCircles);
+    printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
     nCirclesNextPow2 = nextPow2(numCircles+1);
-    // printf("%d\n", numCircles);
+    printf("%d\n", numCircles);
 }
 
 void
 CudaRenderer::setup() {
-    // printf("Setting up\n");
+    printf("Setting up\n");
     int deviceCount = 0;
     std::string name;
     cudaError_t err = cudaGetDeviceCount(&deviceCount);
 
-    // printf("---------------------------------------------------------\n");
-    // printf("Initializing CUDA for CudaRenderer\n");
-    // printf("Found %d CUDA devices\n", deviceCount);
+    printf("---------------------------------------------------------\n");
+    printf("Initializing CUDA for CudaRenderer\n");
+    printf("Found %d CUDA devices\n", deviceCount);
 
     for (int i=0; i<deviceCount; i++) {
         cudaDeviceProp deviceProps;
         cudaGetDeviceProperties(&deviceProps, i);
         name = deviceProps.name;
 
-        // printf("Device %d: %s\n", i, deviceProps.name);
-        // printf("   SMs:        %d\n", deviceProps.multiProcessorCount);
-        // printf("   Global mem: %.0f MB\n", static_cast<float>(deviceProps.totalGlobalMem) / (1024 * 1024));
-        // printf("   CUDA Cap:   %d.%d\n", deviceProps.major, deviceProps.minor);
-        // printf("   Max threads per block:   %d\n", deviceProps.maxThreadsPerBlock);
-        // printf("   Max grid size:   (%d, %d, %d)\n", deviceProps.maxGridSize[0], deviceProps.maxGridSize[1], deviceProps.maxGridSize[2]);
+        printf("Device %d: %s\n", i, deviceProps.name);
+        printf("   SMs:        %d\n", deviceProps.multiProcessorCount);
+        printf("   Global mem: %.0f MB\n", static_cast<float>(deviceProps.totalGlobalMem) / (1024 * 1024));
+        printf("   CUDA Cap:   %d.%d\n", deviceProps.major, deviceProps.minor);
+        printf("   Max threads per block:   %d\n", deviceProps.maxThreadsPerBlock);
+        printf("   Max grid size:   (%d, %d, %d)\n", deviceProps.maxGridSize[0], deviceProps.maxGridSize[1], deviceProps.maxGridSize[2]);
     }
-    // printf("---------------------------------------------------------\n");
+    printf("---------------------------------------------------------\n");
     
     // By this time the scene should be loaded.  Now copy all the key
     // data structures into device memory so they are accessible to
@@ -755,7 +744,7 @@ CudaRenderer::setup() {
     gpuErrchk(cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice));
     cudaDeviceSynchronize();
 
-    // printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
+    printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
     gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2));
     cudaDeviceSynchronize();
     gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
@@ -769,7 +758,7 @@ CudaRenderer::setup() {
     // cudaDeviceSynchronize();
     // gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * 64));
     // cudaDeviceSynchronize();
-    // printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
+    printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -827,7 +816,7 @@ CudaRenderer::setup() {
 // image first to avoid memory leak.
 void
 CudaRenderer::allocOutputImage(int width, int height) {
-    // printf("Allocating image\n");
+    printf("Allocating image\n");
     if (image)
         delete image;
     image = new Image(width, height);
@@ -843,7 +832,7 @@ CudaRenderer::allocOutputImage(int width, int height) {
 // the clear depends on the scene being rendered.
 void
 CudaRenderer::clearImage() {
-    // printf("Clearing image\n");
+    printf("Clearing image\n");
     // 256 threads per block is a healthy number
     dim3 blockDim(16, 16, 1);
     dim3 gridDim(
@@ -864,7 +853,7 @@ CudaRenderer::clearImage() {
 // and velocities
 void
 CudaRenderer::advanceAnimation() {
-    // printf("Advancing animation\n");
+    printf("Advancing animation\n");
     // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
@@ -885,7 +874,7 @@ CudaRenderer::advanceAnimation() {
 /*
 void
 CudaRenderer::render() {
-    // printf("Rendering image\n");
+    printf("Rendering image\n");
     // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
@@ -897,37 +886,20 @@ CudaRenderer::render() {
 
 void
 CudaRenderer::render() {
-    // printf("nextPow2: %d, %d, %d, %d, %d, %d, %d", nextPow2(0), nextPow2(1), nextPow2(2), nextPow2(3), nextPow2(4), nextPow2(5), nextPow2(6));
-    // printf("cuda render (W=%d, H=%d, C=%d)\n", myImageWidth, myImageHeight, numCircles);
-    // printf("nWidthTiles=%d, nHeightTiles=%d\n", nWidthTiles, nHeightTiles);
     dim3 blockDim;
     dim3 gridDim;
 
     // Tile x Circle intersection
-    // printf("> step 1\n");
-    // blockDim = dim3(1, 1, 256);
-    // gridDim = dim3(nWidthTiles, nHeightTiles, (numCircles + 255)/256);
     blockDim = dim3(256, 1, 1);
     gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
-    // printf("Grid : (%d, %d, %d) blocks. Blocks : (%d, %d, %d) threads.\n", gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z);
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        // printf("CUDA Error: %s\n", cudaGetErrorString(err));
-    }
     cudaDeviceSynchronize();
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        // printf("CUDA Error after sync: %s\n", cudaGetErrorString(err));
-    }
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
-    // printf("> step 2.1\n");
     multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
     cudaDeviceSynchronize();
 
     // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
-    // printf("> step 2.2\n");
     blockDim = dim3(256, 1, 1);
     gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
     kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
@@ -935,7 +907,6 @@ CudaRenderer::render() {
     cudaDeviceSynchronize();
 
     // Update pixels
-    // printf("> step 3\n");
     blockDim = dim3(16, 16);
     gridDim = dim3(nWidthTiles, nHeightTiles);
     kernelPixelUpdate<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
