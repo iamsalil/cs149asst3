@@ -644,25 +644,15 @@ CudaRenderer::~CudaRenderer() {
     }
 
     if (cudaDevicePosition) {
-        printf("freeing 1\n");
-        gpuErrchk(cudaFree(cudaDevicePosition));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(cudaDeviceVelocity));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(cudaDeviceColor));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(cudaDeviceRadius));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(cudaDeviceImageData));
-        cudaDeviceSynchronize();
+        cudaFree(cudaDevicePosition);
+        cudaFree(cudaDeviceVelocity);
+        cudaFree(cudaDeviceColor);
+        cudaFree(cudaDeviceRadius);
+        cudaFree(cudaDeviceImageData);
 
-        printf("freeing 2\n");
-        gpuErrchk(cudaFree(tileCircleIntersect));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(tileCircleUpdates));
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaFree(tileNumCircles));
-        cudaDeviceSynchronize();
+        cudaFree(tileCircleIntersect);
+        cudaFree(tileCircleUpdates);
+        cudaFree(tileNumCircles);
     }
 }
 
@@ -674,10 +664,10 @@ CudaRenderer::getImage() {
 
     printf("Copying image data from device\n");
 
-    gpuErrchk(cudaMemcpy(image->data,
+    cudaMemcpy(image->data,
                cudaDeviceImageData,
                sizeof(float) * 4 * myImageWidth * myImageHeight,
-               cudaMemcpyDeviceToHost));
+               cudaMemcpyDeviceToHost);
 
     return image;
 }
@@ -724,33 +714,21 @@ CudaRenderer::setup() {
     // See the CUDA Programmer's Guide for descriptions of
     // cudaMalloc and cudaMemcpy
 
-    gpuErrchk(cudaMalloc(&cudaDevicePosition, sizeof(float) * 3 * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&cudaDeviceColor, sizeof(float) * 3 * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * myImageWidth * myImageHeight));
-    cudaDeviceSynchronize();
+    cudaMalloc(&cudaDevicePosition, sizeof(float) * 3 * numCircles);
+    cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numCircles);
+    cudaMalloc(&cudaDeviceColor, sizeof(float) * 3 * numCircles);
+    cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles);
+    cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * myImageWidth * myImageHeight);
 
-    gpuErrchk(cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
+    cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
     // printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
-    gpuErrchk(cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles));
-    cudaDeviceSynchronize();
+    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
+    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
+    cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
     // printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
@@ -772,7 +750,7 @@ CudaRenderer::setup() {
     params.radius = cudaDeviceRadius;
     params.imageData = cudaDeviceImageData;
 
-    gpuErrchk(cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants)));
+    cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants));
 
     // also need to copy over the noise lookup tables, so we can
     // implement noise on the GPU
@@ -780,12 +758,9 @@ CudaRenderer::setup() {
     int* permY;
     float* value1D;
     getNoiseTables(&permX, &permY, &value1D);
-    gpuErrchk(cudaMemcpyToSymbol(cuConstNoiseXPermutationTable, permX, sizeof(int) * 256));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMemcpyToSymbol(cuConstNoiseYPermutationTable, permY, sizeof(int) * 256));
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaMemcpyToSymbol(cuConstNoise1DValueTable, value1D, sizeof(float) * 256));
-    cudaDeviceSynchronize();
+    cudaMemcpyToSymbol(cuConstNoiseXPermutationTable, permX, sizeof(int) * 256);
+    cudaMemcpyToSymbol(cuConstNoiseYPermutationTable, permY, sizeof(int) * 256);
+    cudaMemcpyToSymbol(cuConstNoise1DValueTable, value1D, sizeof(float) * 256);
 
     // last, copy over the color table that's used by the shading
     // function for circles in the snowflake demo
@@ -798,8 +773,7 @@ CudaRenderer::setup() {
         {.8f, 0.8f, 1.f},
     };
 
-    gpuErrchk(cudaMemcpyToSymbol(cuConstColorRamp, lookupTable, sizeof(float) * 3 * COLOR_MAP_SIZE));
-    cudaDeviceSynchronize();
+    cudaMemcpyToSymbol(cuConstColorRamp, lookupTable, sizeof(float) * 3 * COLOR_MAP_SIZE);
 
 }
 
