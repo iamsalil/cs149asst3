@@ -673,6 +673,20 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
 
+#include <thrust/scan.h>
+#include <thrust/device_ptr.h>
+void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length) {
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    thrust::device_ptr<int> d_ptr(deviceArr);
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            thrust::exclusive_scan(d_ptr, d_ptr+length, d_ptr);
+            d_ptr += length;
+        }
+    }
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+}
+
 __global__ void
 kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int actualN) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
@@ -1016,7 +1030,8 @@ CudaRenderer::render() {
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
     startTime = CycleTimer::currentSeconds();
-    multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
+    // multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
+    multiExclusiveScanThrust(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
     cudaDeviceSynchronize();
     endTime = CycleTimer::currentSeconds();
     printf("time: %fms\n", 1000*(endTime - startTime));
