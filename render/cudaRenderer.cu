@@ -626,9 +626,14 @@ kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
 void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 
+    double startTime;
+    double endTime;
+
     dim3 blockDim(256, 1, 1);
     dim3 gridDim;
+    
     // Upsweep
+    startTime = CycleTimer::currentSeconds();
     int blocks = (length + 255) / 256;
     for (int twoD = 1; twoD <= length/2; twoD*=2) {
         int twoDPlus1 = 2*twoD;
@@ -639,12 +644,18 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         kernelMultiExclusiveScanUpsweep<<<gridDim, blockDim>>>(length, twoD, twoDPlus1, deviceArr);
         cudaDeviceSynchronize();
     }
+    endTime = CycleTimer::currentSeconds();
+    printf("  time: %fms\n", 1000*(endTime - startTime));
     // Mid
+    startTime = CycleTimer::currentSeconds();
     blockDim = dim3(16, 16);
     gridDim = dim3((width +15)/16, (height + 15)/16);
     kernelMultiExclusiveScanMidpoint<<<gridDim, blockDim>>>(length, width, height, deviceArr);
     cudaDeviceSynchronize();
+    endTime = CycleTimer::currentSeconds();
+    printf("  time: %fms\n", 1000*(endTime - startTime));
     /// Downsweep
+    startTime = CycleTimer::currentSeconds();
     blockDim = dim3(256, 1, 1);
     int effectiveLength = 1;
     for (int twoD = length/2; twoD >= 1; twoD /= 2) {
@@ -655,6 +666,8 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
         cudaDeviceSynchronize();
         effectiveLength *= 2;
     }
+    endTime = CycleTimer::currentSeconds();
+    printf("  time: %fms\n", 1000*(endTime - startTime));
 
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
@@ -999,14 +1012,14 @@ CudaRenderer::render() {
     kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
     cudaDeviceSynchronize();
     endTime = CycleTimer::currentSeconds();
-    printf("time: %f\n", endTime - startTime);
+    printf("time: %fms\n", 1000*(endTime - startTime));
 
     // Order circles that intersect each tile (Part1 - Exclusive Scan)
     startTime = CycleTimer::currentSeconds();
     multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
     cudaDeviceSynchronize();
     endTime = CycleTimer::currentSeconds();
-    printf("time: %f\n", endTime - startTime);
+    printf("time: %fms\n", 1000*(endTime - startTime));
 
     // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
     startTime = CycleTimer::currentSeconds();
@@ -1016,7 +1029,7 @@ CudaRenderer::render() {
          tileNumCircles, nCirclesNextPow2, numCircles);
     cudaDeviceSynchronize();
     endTime = CycleTimer::currentSeconds();
-    printf("time: %f\n", endTime - startTime);
+    printf("time: %fms\n", 1000*(endTime - startTime));
 
     // Update pixels
     startTime = CycleTimer::currentSeconds();
@@ -1029,5 +1042,5 @@ CudaRenderer::render() {
     }
     cudaDeviceSynchronize();
     endTime = CycleTimer::currentSeconds();
-    printf("time: %f\n", endTime - startTime);
+    printf("time: %fms\n", 1000*(endTime - startTime));
 }
