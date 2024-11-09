@@ -570,14 +570,14 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
     int baseOffset = tileIndex * N;
     int stepLocOffset = tileIndex * actualN;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index < actualN-1) {
+    if (index < actualN) {
         int current = steppingArr[baseOffset + index];
         int next = steppingArr[baseOffset + index+1];
         if (next == current+1) {
             // printf("  > found that tile %d intersected circle %d\n", tileIndex, index);
             stepLocs[stepLocOffset+current] = index;
         }
-    } else if (index == actualN - 1) {
+    } else if (index == actualN) {
         if (tileIndex == 2080) {
             printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
         }
@@ -699,7 +699,7 @@ CudaRenderer::loadScene(SceneName scene) {
     printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
-    nCirclesNextPow2 = nextPow2(numCircles);
+    nCirclesNextPow2 = nextPow2(numCircles+1);
     printf("%d\n", numCircles);
 }
 
