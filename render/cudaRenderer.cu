@@ -389,6 +389,107 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
     // END SHOULD-BE-ATOMIC REGION
 }
 
+__device__ __inline__ void
+shadePixelSnow(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
+
+    float diffX = p.x - pixelCenter.x;
+    float diffY = p.y - pixelCenter.y;
+    float pixelDist = diffX * diffX + diffY * diffY;
+
+    float rad = cuConstRendererParams.radius[circleIndex];;
+    float maxDist = rad * rad;
+
+    // circle does not contribute to the image
+    if (pixelDist > maxDist)
+        return;
+
+    float3 rgb;
+    float alpha;
+
+    // there is a non-zero contribution.  Now compute the shading value
+
+    // suggestion: This conditional is in the inner loop.  Although it
+    // will evaluate the same for all threads, there is overhead in
+    // setting up the lane masks etc to implement the conditional.  It
+    // would be wise to perform this logic outside of the loop next in
+    // kernelRenderCircles.  (If feeling good about yourself, you
+    // could use some specialized template magic).
+    const float kCircleMaxAlpha = .5f;
+    const float falloffScale = 4.f;
+
+    float normPixelDist = sqrt(pixelDist) / rad;
+    rgb = lookupColor(normPixelDist);
+
+    float maxAlpha = .6f + .4f * (1.f-p.z);
+    maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
+    alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
+
+    float oneMinusAlpha = 1.f - alpha;
+
+    // BEGIN SHOULD-BE-ATOMIC REGION
+    // global memory read
+
+    float4 existingColor = *imagePtr;
+    float4 newColor;
+    newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;
+    newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
+    newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
+    newColor.w = alpha + existingColor.w;
+
+    // global memory write
+    *imagePtr = newColor;
+
+    // END SHOULD-BE-ATOMIC REGION
+}
+
+__device__ __inline__ void
+shadePixelNotSnow(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
+
+    float diffX = p.x - pixelCenter.x;
+    float diffY = p.y - pixelCenter.y;
+    float pixelDist = diffX * diffX + diffY * diffY;
+
+    float rad = cuConstRendererParams.radius[circleIndex];;
+    float maxDist = rad * rad;
+
+    // circle does not contribute to the image
+    if (pixelDist > maxDist)
+        return;
+
+    float3 rgb;
+    float alpha;
+
+    // there is a non-zero contribution.  Now compute the shading value
+
+    // suggestion: This conditional is in the inner loop.  Although it
+    // will evaluate the same for all threads, there is overhead in
+    // setting up the lane masks etc to implement the conditional.  It
+    // would be wise to perform this logic outside of the loop next in
+    // kernelRenderCircles.  (If feeling good about yourself, you
+    // could use some specialized template magic).
+    // simple: each circle has an assigned color
+    int index3 = 3 * circleIndex;
+    rgb = *(float3*)&(cuConstRendererParams.color[index3]);
+    alpha = .5f;
+
+    float oneMinusAlpha = 1.f - alpha;
+
+    // BEGIN SHOULD-BE-ATOMIC REGION
+    // global memory read
+
+    float4 existingColor = *imagePtr;
+    float4 newColor;
+    newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;
+    newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
+    newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
+    newColor.w = alpha + existingColor.w;
+
+    // global memory write
+    *imagePtr = newColor;
+
+    // END SHOULD-BE-ATOMIC REGION
+}
+
 // kernelRenderCircles -- (CUDA device code)
 //
 // Each thread renders a circle.  Since there is no protection to
@@ -576,7 +677,7 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
 }
 
 __global__ void
-kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
+kernelPixelUpdateSnow(int* tileCircleUpdates, int* tileNumCircles) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
     int numCircles = cuConstRendererParams.numCircles;
@@ -602,7 +703,38 @@ kernelPixelUpdate(int* tileCircleUpdates, int* tileNumCircles) {
         circleIndex = tileCircleUpdates[baseOffset + i];
         circleIndex3 = 3 * circleIndex;
         circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
-        shadePixel(circleIndex, pixelCenter, circlePosition, imgPtr);
+        shadePixelSnow(circleIndex, pixelCenter, circlePosition, imgPtr);
+    }
+}
+
+__global__ void
+kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles) {
+    int width = cuConstRendererParams.imageWidth;
+    int height = cuConstRendererParams.imageHeight;
+    int numCircles = cuConstRendererParams.numCircles;
+
+    int imageX = blockIdx.x * blockDim.x + threadIdx.x;
+    int imageY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((imageX >= width) || (imageY >= height))
+        return;
+
+    int pixelIdx = imageY * cuConstRendererParams.imageWidth + imageX;
+    float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * pixelIdx]);
+    float2 pixelCenter = make_float2(
+            (0.5f + static_cast<float>(imageX)) / static_cast<float>(width),
+            (0.5f + static_cast<float>(imageY)) / static_cast<float>(height));
+
+    int tileIdx = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = tileIdx * numCircles;
+
+    int circleIndex, circleIndex3;
+    float3 circlePosition;
+    for (int i = 0; i < tileNumCircles[tileIdx]; i++) {
+        circleIndex = tileCircleUpdates[baseOffset + i];
+        circleIndex3 = 3 * circleIndex;
+        circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
+        shadePixelNotSnow(circleIndex, pixelCenter, circlePosition, imgPtr);
     }
 }
 
@@ -876,6 +1008,10 @@ CudaRenderer::render() {
     // Update pixels
     blockDim = dim3(16, 16);
     gridDim = dim3(nWidthTiles, nHeightTiles);
-    kernelPixelUpdate<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
+    if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
+        kernelPixelUpdateSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
+    } else {
+        kernelPixelUpdateNotSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
+    }
     cudaDeviceSynchronize();
 }
