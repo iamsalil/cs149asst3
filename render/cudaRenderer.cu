@@ -578,7 +578,9 @@ kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, 
             stepLocs[stepLocOffset+current] = index;
         }
     } else if (index == actualN - 1) {
-        // printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
+        if (tileIndex == 2080) {
+            printf("  > tile %d had %d circle hits\n", tileIndex, steppingArr[baseOffset + index]);
+        }
         numSteps[tileIndex] = steppingArr[baseOffset + index];
     }
 }
@@ -895,6 +897,7 @@ CudaRenderer::render() {
 
 void
 CudaRenderer::render() {
+    printf("nextPow2: %d, %d, %d, %d, %d, %d, %d", nextPow2(0), nextPow2(1), nextPow2(2), nextPow2(3), nextPow2(4), nextPow2(5), nextPow2(6));
     printf("cuda render (W=%d, H=%d, C=%d)\n", myImageWidth, myImageHeight, numCircles);
     printf("nWidthTiles=%d, nHeightTiles=%d\n", nWidthTiles, nHeightTiles);
     dim3 blockDim;
