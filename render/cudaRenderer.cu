@@ -9,6 +9,7 @@
 #include <driver_functions.h>
 
 #include "cudaRenderer.h"
+#include "cycleTimer.h"
 #include "image.h"
 #include "noise.h"
 #include "sceneLoader.h"
@@ -996,7 +997,6 @@ CudaRenderer::render() {
 }
 */
 
-#include "cycleTimer.h"
 void
 CudaRenderer::render() {
     double startTime;
