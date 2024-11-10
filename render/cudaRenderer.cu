@@ -663,7 +663,7 @@ void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int l
 }
 
 __global__ void
-kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int length) {
+kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int tempDataLength, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int blockInTileOffset = blockIdx.x * blockDim.x;
     int baseOffset = tileIndex * length + blockInTileOffset;
@@ -679,8 +679,10 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int length) {
     __syncthreads();
     */
     int val = scan_block(deviceArr + baseOffset, threadIdx.x);
-    if (threadIdx.x == 255)
-        tempData[tileIndex*256 + blockIdx.x] = val;
+    if (threadIdx.x == 255) {
+        printf("block %d final inclusive scan value %d\n", blockIdx.x)
+        tempData[tileIndex*tempDataLength + blockIdx.x] = val;
+    }
     __syncthreads();
     /*
     if ((tileIndex == 2012) && (blockIdx.x == 0)) {
@@ -727,24 +729,24 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
 void multiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int width, int height, int length, int N) {
     int numBlocksPerTile = (N + 255)/256;
     printf("  > multi block exclusive scan (%d circles in %d blocks)\n", N, numBlocksPerTile);
-    // Part 1 - Do blocks independently
-    printf("    > part 1\n");
-    dim3 blockDim(256, 1, 1);
-    dim3 gridDim(numBlocksPerTile, width, height);
-    for (int i = 0; i < numBlocksPerTile; i++) {
-        printf("block %d: ", i);
-        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-        cudaDeviceSynchronize();
-    }
-    kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, tempData, length);
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
-    for (int i = 0; i < numBlocksPerTile; i++) {
-        printf("block %d: ", i);
-        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-        cudaDeviceSynchronize();
-    }
     if (numBlocksPerTile <= 32) {
+        // Part 1 (32) - Do blocks independently
+        printf("    > part 1\n");
+        dim3 blockDim(256, 1, 1);
+        dim3 gridDim(numBlocksPerTile, width, height);
+        for (int i = 0; i < numBlocksPerTile; i++) {
+            printf("block %d: ", i);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
+            cudaDeviceSynchronize();
+        }
+        kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, tempData, 32, length);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+        for (int i = 0; i < numBlocksPerTile; i++) {
+            printf("block %d: ", i);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
+            cudaDeviceSynchronize();
+        }
         // Part 2 (32) - Add blocks together
         printf("    > part 2\n");
         kernelPrintArrV2<<<1, 1>>>(tempData, 2012*32, 32);
@@ -765,6 +767,23 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int width, int
             cudaDeviceSynchronize();
         }
     } else {
+        // Part 1 (256) - Do blocks independently
+        printf("    > part 1\n");
+        dim3 blockDim(256, 1, 1);
+        dim3 gridDim(numBlocksPerTile, width, height);
+        for (int i = 0; i < numBlocksPerTile; i++) {
+            printf("block %d: ", i);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
+            cudaDeviceSynchronize();
+        }
+        kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, tempData, 256, length);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+        for (int i = 0; i < numBlocksPerTile; i++) {
+            printf("block %d: ", i);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
+            cudaDeviceSynchronize();
+        }
         // Part 2 (256) - Add blocks together
         printf("    > part 2\n");
         multiExclusiveScan_SingleBlock(tempData, width, height, 256);
