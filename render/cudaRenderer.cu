@@ -639,7 +639,7 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
             for (int j = 0; j < 32; j++) {
                 printf("%d ", ptr[j]);
             }
-            printf("] --> ");
+            printf("] =====>\n");
         }
         __syncwarp();
         if (lane >= shift) {
@@ -656,7 +656,7 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
         }
         __syncwarp();
         if ((tileIndex == 2080) && (lane == 0)) {
-            printf("[");
+            printf("=====> [");
             for (int j = 0; j < 32; j++) {
                 printf("%d ", ptr[j]);
             }
