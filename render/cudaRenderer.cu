@@ -683,13 +683,15 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
 }
 
 void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int length, int N) {
-    printf("  > multi block exclusive scan\n");
     int numBlocksPerTile = (N + 255)/256;
+    printf("  > multi block exclusive scan (%d circles in %d blocks)\n", N, numBlocksPerTile);
     // Part 1 - Do blocks independently
     printf("    > part 1\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     if (numBlocksPerTile <= 32) {
         // Part 2 - Add blocks together
         printf("    > part 2\n");
