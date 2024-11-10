@@ -631,14 +631,16 @@ __global__ void
 kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * length;
-
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, 32);
     deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x);
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, 32);
 }
 
 void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
     printf("  > single warp exclusive scan\n");
     dim3 blockDim(32, 1, 1);
     dim3 gridDim(1, width, height);
+
     kernelMultiExclusiveScan_SingleWarp<<<gridDim, blockDim>>>(deviceArr, length);
 }
 
