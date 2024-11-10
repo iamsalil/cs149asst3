@@ -613,7 +613,7 @@ scan_block(int* ptr, const unsigned int idx) {
     int val = scan_warp(ptr, idx);
 
     if (lane == 31)
-        ptr[warp_idx] = ptr[idx];
+        ptr[warp_id] = ptr[idx];
     __syncthreads();
 
     if (warp_id == 0)
@@ -652,7 +652,7 @@ kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
 void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(1, width, height);
-    kernelMutliExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    kernelMultiExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
 }
 
 __global__ void
@@ -702,7 +702,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     if (numBlocksPerTile <= 32) {
         // Part 2 - Add blocks together
         int* tempData = NULL;
-        cudaMalloc(&tempData, sizeof(int) * nWidthTiles * nHeightTiles * 32);
+        cudaMalloc(&tempData, sizeof(int) * width * height * 32);
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
@@ -715,7 +715,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     } else {
         // Part 2 - Add blocks together
         int* tempData = NULL;
-        cudaMalloc(&tempData, sizeof(int) * nWidthTiles * nHeightTiles * 256);
+        cudaMalloc(&tempData, sizeof(int) * width * height * 256);
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
@@ -984,13 +984,13 @@ CudaRenderer::loadScene(SceneName scene) {
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
     // Figuring out circle space allocation
     if (numCircles <= 32-1) {
-        circleSpaceAllocation = 32;
+        circleSpaceAllocated = 32;
     } else if (numCircles <= 256-1) {
-        circleSpaceAllocation = 256;
+        circleSpaceAllocated = 256;
     } else if (numCircles <= 256*256-1) {
-        circleSpaceAllocation = 256*((numCircles + 255)/256);
+        circleSpaceAllocated = 256*((numCircles + 255)/256);
     } else {
-        circleSpaceAllocation = 256*256;
+        circleSpaceAllocated = 256*256;
     }
     // printf("%d\n", numCircles);
 }
