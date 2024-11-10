@@ -614,7 +614,7 @@ scan_block(int* ptr, const unsigned int idx) {
 }
 
 __device__ void
-scan_block_test(int* ptr, const unsigned int idx, tileIndex) {
+scan_block_test(int* ptr, const unsigned int idx, int tileIndex) {
     const unsigned int lane = idx % 32;
     const unsigned int warp_id = idx >> 5;
 
@@ -651,7 +651,7 @@ scan_block_test(int* ptr, const unsigned int idx, tileIndex) {
     __syncthreads();
 
     if (tileIndex ==  2080) {
-        printf("warp %d lane %d (%d) = %d\n", warp_id, lane, idx, val);
+        printf("FINAL warp %d lane %d (%d) = %d\n", warp_id, lane, idx, val);
     }
     __syncthreads();
 
