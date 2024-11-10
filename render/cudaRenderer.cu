@@ -555,7 +555,7 @@ static inline int nextPow2(int n) {
 
 #include "circleBoxTest.cu_inl"
 __global__ void
-kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
+kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
@@ -567,13 +567,14 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * N;
 
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int index3 = 3 * index;
+    int localCircleIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    int circleIndex = localCircleIndex + s;
+    int circleIndex3 = 3 * circleIndex;
 
-    if (index < cuConstRendererParams.numCircles) {
-        float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
-        float rad = cuConstRendererParams.radius[index];
-        tileCircleIntersect[baseOffset + index] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
+    if (circleIndex < e) {
+        float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
+        float rad = cuConstRendererParams.radius[circleIndex];
+        tileCircleIntersect[baseOffset + localCircleIndex] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
     }
 }
 
@@ -584,6 +585,147 @@ kernelPrintArr(int* arr, int idx, int N) {
         printf("%d ", arr[idx*N+i]);
     }
     printf("]\n");
+}
+
+__device__ int
+scan_warp(int* ptr, const unsigned int idx) {
+    const unsigned int lane = idx % 32;
+
+    __syncwarp();
+    for (int i = 0; i < 5; i++) {
+        int shift = 1<<i;
+        if (lane >= shift) {
+            int tmp1 = ptr[idx - shift];
+            int tmp2 = ptr[idx];
+            __syncwarp();
+            ptr[idx] = tmp1 + tmp2;
+            __syncwarp();
+        }
+    }
+    return (lane > 0) ? ptr[idx-1] : 0;
+}
+
+__device__ void
+scan_block(int* ptr, const unsigned int idx) {
+    const unsigned int lane = idx % 32;
+    const unsigned int warp_id = idx >> 5;
+
+    int val = scan_warp(ptr, idx);
+
+    if (lane == 31)
+        ptr[warp_idx] = ptr[idx];
+    __syncthreads();
+
+    if (warp_id == 0)
+        scan_warp(ptr, idx);
+    __syncthreads();
+
+    if (warp_id > 0)
+        val = val + ptr[warp_id-1];
+    __syncthreads();
+
+    ptr[idx] = val;
+}
+
+__global__ void
+kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
+    int baseOffset = tileIndex * length;
+
+    deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x);
+}
+
+void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
+    dim3 blockDim(32, 1, 1);
+    dim3 gridDim(1, width, height);
+    kernelMultiExclusiveScan_SingleWarp<<<gridDim, blockDim>>>(deviceArr, length);
+}
+
+__global__ void
+kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
+    int baseOffset = tileIndex * length;
+
+    scan_block(deviceArr + baseOffset, threadIdx.x);
+}
+
+void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
+    dim3 blockDim(256, 1, 1);
+    dim3 gridDim(1, width, height);
+    kernelMutliExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
+}
+
+__global__ void
+kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
+    int blockInTileOffset = blockIdx.x * blockDim.x;
+    int baseOffset = tileIndex * length + blockInTileOffset;
+    scan_block(deviceArr + baseOffset, threadIdx.x);
+}
+
+__global__ void
+kernelMultiCopyMemory(int* deviceArr, int* tempData, int width, int height, int length, int tempTileLength, int numBlocksPerTile) {
+    int tileX = blockIdx.x * blockDim.x + threadIdx.x;
+    int tileY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((tileX >= width) || (tileY >= height))
+        return;
+
+    if (blockIdx.z >= numBlocksPerTile)
+        return;
+
+    int tileIndex = tileY * width + tileX;
+    int baseOffset = tileIndex * length;
+    int blockInTileOffset = blockIdx.z * 256 + 255;
+
+    int tempOffset = tileIndex * tempTileLength;
+
+    tempData[tempOffset + blockIdx.z] = deviceArr[baseOffset + blockInTileOffset];
+}
+
+__global__ void
+kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int length, int tempTileLength) {
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
+    int blockInTileOffset = blockIdx.x * blockDim.x;
+    int baseOffset = tileIndex * length + blockInTileOffset;
+    int tempOffset = tileIndex * tempTileLength;
+
+    deviceArr[baseOffset + threadIdx.x] += tempData[tempOffset + blockIdx.x];
+}
+
+void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int length, int N) {
+    int numBlocksPerTile = (N + 255)/256;
+    // Part 1 - Do blocks independently
+    dim3 blockDim(256, 1, 1);
+    dim3 gridDim(numBlocksPerTile, width, height);
+    kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    if (numBlocksPerTile <= 32) {
+        // Part 2 - Add blocks together
+        int* tempData = NULL;
+        cudaMalloc(&tempData, sizeof(int) * nWidthTiles * nHeightTiles * 32);
+        blockDim = dim3(16, 16, 1);
+        gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
+        kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
+        multiExclusiveScan_SingleWarp(deviceArr, width, height, 32);
+        // Part 3 - Add results back in
+        blockDim = dim3(256, 1, 1);
+        gridDim = dim3(numBlocksPerTile, width, height);
+        kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32);
+        cudaFree(tempData);
+    } else {
+        // Part 2 - Add blocks together
+        int* tempData = NULL;
+        cudaMalloc(&tempData, sizeof(int) * nWidthTiles * nHeightTiles * 256);
+        blockDim = dim3(16, 16, 1);
+        gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
+        kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
+        multiExclusiveScan_SingleBlock(deviceArr, width, height, 256);
+        // Part 3 - Add results back in
+        blockDim = dim3(256, 1, 1);
+        gridDim = dim3(numBlocksPerTile, width, height);
+        kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256);
+        cudaFree(tempData);
+    }
 }
 
 __global__ void
@@ -673,6 +815,7 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
 
+/*
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
 void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length) {
@@ -686,29 +829,31 @@ void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length)
     }
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
+*/
 
 __global__ void
-kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int actualN) {
+kernelMultiFindStepLocs(int* steppingArr, int*  stepLocs, int* numSteps, int N, int s, int e) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * N;
-    int stepLocOffset = tileIndex * actualN;
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index < actualN) {
-        int current = steppingArr[baseOffset + index];
-        int next = steppingArr[baseOffset + index+1];
+
+    int localCircleIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    int circleIndex = localCircleIndex + s;
+
+    if (circleIndex < e) {
+        int current = steppingArr[baseOffset + localCircleIndex];
+        int next = steppingArr[baseOffset + localCircleIndex+1];
         if (next == current+1) {
-            stepLocs[stepLocOffset+current] = index;
+            stepLocs[baseOffset + current] = circleIndex;
         }
-    } else if (index == actualN) {
-        numSteps[tileIndex] = steppingArr[baseOffset + index];
+    } else if (circleIndex == e) {
+        numSteps[tileIndex] = steppingArr[baseOffset + localCircleIndex];
     }
 }
 
 __global__ void
-kernelPixelUpdateSnow(int* tileCircleUpdates, int* tileNumCircles) {
+kernelPixelUpdateSnow(int* tileCircleUpdates, int* tileNumCircles, int N) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
-    int numCircles = cuConstRendererParams.numCircles;
 
     int imageX = blockIdx.x * blockDim.x + threadIdx.x;
     int imageY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -716,18 +861,18 @@ kernelPixelUpdateSnow(int* tileCircleUpdates, int* tileNumCircles) {
     if ((imageX >= width) || (imageY >= height))
         return;
 
-    int pixelIdx = imageY * cuConstRendererParams.imageWidth + imageX;
+    int pixelIdx = imageY * width + imageX;
     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * pixelIdx]);
     float2 pixelCenter = make_float2(
             (0.5f + static_cast<float>(imageX)) / static_cast<float>(width),
             (0.5f + static_cast<float>(imageY)) / static_cast<float>(height));
 
-    int tileIdx = blockIdx.y * gridDim.x + blockIdx.x;
-    int baseOffset = tileIdx * numCircles;
+    int tileIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = tileIndex * N;
 
     int circleIndex, circleIndex3;
     float3 circlePosition;
-    for (int i = 0; i < tileNumCircles[tileIdx]; i++) {
+    for (int i = 0; i < tileNumCircles[tileIndex]; i++) {
         circleIndex = tileCircleUpdates[baseOffset + i];
         circleIndex3 = 3 * circleIndex;
         circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
@@ -736,10 +881,9 @@ kernelPixelUpdateSnow(int* tileCircleUpdates, int* tileNumCircles) {
 }
 
 __global__ void
-kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles) {
+kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles, int N) {
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
-    int numCircles = cuConstRendererParams.numCircles;
 
     int imageX = blockIdx.x * blockDim.x + threadIdx.x;
     int imageY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -747,18 +891,18 @@ kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles) {
     if ((imageX >= width) || (imageY >= height))
         return;
 
-    int pixelIdx = imageY * cuConstRendererParams.imageWidth + imageX;
+    int pixelIdx = imageY * width + imageX;
     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * pixelIdx]);
     float2 pixelCenter = make_float2(
             (0.5f + static_cast<float>(imageX)) / static_cast<float>(width),
             (0.5f + static_cast<float>(imageY)) / static_cast<float>(height));
 
-    int tileIdx = blockIdx.y * gridDim.x + blockIdx.x;
-    int baseOffset = tileIdx * numCircles;
+    int tileIndex = blockIdx.y * gridDim.x + blockIdx.x;
+    int baseOffset = tileIndex * N;
 
     int circleIndex, circleIndex3;
     float3 circlePosition;
-    for (int i = 0; i < tileNumCircles[tileIdx]; i++) {
+    for (int i = 0; i < tileNumCircles[tileIndex]; i++) {
         circleIndex = tileCircleUpdates[baseOffset + i];
         circleIndex3 = 3 * circleIndex;
         circlePosition = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
@@ -838,7 +982,16 @@ CudaRenderer::loadScene(SceneName scene) {
     printf("Load scene\n");
     sceneName = scene;
     loadCircleScene(sceneName, numCircles, position, velocity, color, radius);
-    nCirclesNextPow2 = nextPow2(numCircles+1);
+    // Figuring out circle space allocation
+    if (numCircles <= 32-1) {
+        circleSpaceAllocation = 32;
+    } else if (numCircles <= 256-1) {
+        circleSpaceAllocation = 256;
+    } else if (numCircles <= 256*256-1) {
+        circleSpaceAllocation = 256*((numCircles + 255)/256);
+    } else {
+        circleSpaceAllocation = 256*256;
+    }
     // printf("%d\n", numCircles);
 }
 
@@ -885,11 +1038,10 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
 
-    // printf("HELLO %d, %d, %p, %p\n", image->width, image->height, image->data, image);
-    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * nCirclesNextPow2);
-    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * numCircles);
+    // Allocating new buffers
+    cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * circleSpaceAllocated);
+    cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * circleSpaceAllocated);
     cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
-    // printf("GOODBYE %d, %d, %p, %p\n", image->width, image->height, image->data, image);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -1013,49 +1165,58 @@ CudaRenderer::render() {
 
 void
 CudaRenderer::render() {
-    double startTime;
-    double endTime;
+    printf("Rendering image\n");
+    // s = index of first circle rendering this iteration
+    // e = index of first circle not rendering this iteration
+    for (int s = 0; s < numCircles; s += 256*256-1) {
+        int e = (s + 256*256-1 < numCircles) ? s + 256*256-1 : numCircles;
+        int numCirclesRendering = e - s;
+        printf("rendering %d circles (%d -> %d)", numCirclesRendering, s, e);
 
-    dim3 blockDim;
-    dim3 gridDim;
+        /*
+        // (1) Tile x circle intersection
+        startTime = CycleTimer::currentSeconds();
+        blockDim = dim3(256, 1, 1);
+        gridDim = dim3((numCirclesRendering + 255)/256, nWidthTiles, nHeightTiles);
+        kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
+        cudaDeviceSynchronize();
+        endTime = CycleTimer::currentSeconds();
+        printf("time: %fms\n", 1000*(endTime - startTime));
 
-    // Tile x Circle intersection
-    startTime = CycleTimer::currentSeconds();
-    blockDim = dim3(256, 1, 1);
-    gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
-    kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, nCirclesNextPow2);
-    cudaDeviceSynchronize();
-    endTime = CycleTimer::currentSeconds();
-    printf("time: %fms\n", 1000*(endTime - startTime));
+        // (2) Exclusive scan
+        startTime = CycleTimer::currentSeconds();
+        if (numCirclesRendering <= 32-1) {
+            multiExclusiveScan_SingleWarp(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated);
+        } else if (numCirclesRendering <= 256-1) {
+            multiExclusiveScan_SingleBlock(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated);
+        } else {
+            multiExclusiveScan_MultiBlock(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated, numCirclesRendering);
+        }
+        cudaDeviceSynchronize();
+        endTime = CycleTimer::currentSeconds();
+        printf("time: %fms\n", 1000*(endTime - startTime));
 
-    // Order circles that intersect each tile (Part1 - Exclusive Scan)
-    startTime = CycleTimer::currentSeconds();
-    // multiExclusiveScan(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
-    multiExclusiveScanThrust(tileCircleIntersect, nWidthTiles, nHeightTiles, nCirclesNextPow2);
-    cudaDeviceSynchronize();
-    endTime = CycleTimer::currentSeconds();
-    printf("time: %fms\n", 1000*(endTime - startTime));
+        // (3) Which circles to update
+        startTime = CycleTimer::currentSeconds();
+        blockDim = dim3(256, 1, 1);
+        gridDim = dim3((numCirclesRendering + 255)/256, nWidthTiles, nHeightTiles);
+        kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, circleSpaceAllocated, s, e);
+        cudaDeviceSynchronize();
+        endTime = CycleTimer::currentSeconds();
+        printf("time: %fms\n", 1000*(endTime - startTime));
 
-    // Order circles that intersect each tile (Part2 - Find steps in Exclusive Scan)
-    startTime = CycleTimer::currentSeconds();
-    blockDim = dim3(256, 1, 1);
-    gridDim = dim3((numCircles + 255)/256, nWidthTiles, nHeightTiles);
-    kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates,
-         tileNumCircles, nCirclesNextPow2, numCircles);
-    cudaDeviceSynchronize();
-    endTime = CycleTimer::currentSeconds();
-    printf("time: %fms\n", 1000*(endTime - startTime));
-
-    // Update pixels
-    startTime = CycleTimer::currentSeconds();
-    blockDim = dim3(16, 16);
-    gridDim = dim3(nWidthTiles, nHeightTiles);
-    if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
-        kernelPixelUpdateSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
-    } else {
-        kernelPixelUpdateNotSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles);
+        // (4) Update pixels
+        startTime = CycleTimer::currentSeconds();
+        blockDim = dim3(16, 16);
+        gridDim = dim3(nWidthTiles, nHeightTiles);
+        if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
+            kernelPixelUpdateSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles, circleSpaceAllocated);
+        } else {
+            kernelPixelUpdateNotSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles, circleSpaceAllocated);
+        }
+        cudaDeviceSynchronize();
+        endTime = CycleTimer::currentSeconds();
+        printf("time: %fms\n", 1000*(endTime - startTime));
+        */
     }
-    cudaDeviceSynchronize();
-    endTime = CycleTimer::currentSeconds();
-    printf("time: %fms\n", 1000*(endTime - startTime));
 }

@@ -27,7 +27,7 @@ private:
     float* cudaDeviceRadius;
     float* cudaDeviceImageData;
 
-    int nCirclesNextPow2;
+    int circleSpaceAllocated;
     int myImageWidth;
     int myImageHeight;
     int nWidthTiles;
