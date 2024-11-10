@@ -632,7 +632,7 @@ kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
         printf("    > %d %d\n", tileIndex, baseOffset);
         printf("      > %d\n", threadIdx.x);
     }
-    deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x, tileIndex);
+    deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x);
 }
 
 void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
