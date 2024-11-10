@@ -485,7 +485,6 @@ loadCircleScene(
         // test scene containing 10K randomily placed circles
 
         numCircles = 10 * 1000;
-        numCircles = 250;
 
         position = new float[3 * numCircles];
         velocity = new float[3 * numCircles];
