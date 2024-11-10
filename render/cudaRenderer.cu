@@ -651,7 +651,7 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
             ptr[idx] = tmp1 + tmp2;
             __syncwarp();
             if (tileIndex == 2080)
-                printf("%d = %d", idx, ptr[idx]);
+                printf("%d = %d\n", idx, ptr[idx]);
             __syncwarp();
         }
         __syncwarp();
