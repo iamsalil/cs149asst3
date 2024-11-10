@@ -649,7 +649,25 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int blockInTileOffset = blockIdx.x * blockDim.x;
     int baseOffset = tileIndex * length + blockInTileOffset;
+    __syncthreads();
+    if ((tileIndex == 2080) && (threadIdx.x == 0)) {
+        printf("block %d: [" blockIdx.x);
+        for (int i = 0; i < 256; i++) {
+            printf("%d ", deviceArr[baseOffset + blockIdx.x]);
+        }
+        printf("]\n");
+    }
+    __syncthreads();
     scan_block(deviceArr + baseOffset, threadIdx.x);
+    __syncthreads();
+    if ((tileIndex == 2080) && (threadIdx.x == 0)) {
+        printf("block %d: [" blockIdx.x);
+        for (int i = 0; i < 256; i++) {
+            printf("%d ", deviceArr[baseOffset + blockIdx.x]);
+        }
+        printf("]\n");
+    }
+    __syncthreads();
 }
 
 __global__ void
@@ -732,6 +750,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     }
 }
 
+/*
 __global__ void
 kernelMultiExclusiveScanUpsweep(int N, int twoD, int twoDPlus1, int* arr) {
     int blockIndex = blockIdx.z * gridDim.y + blockIdx.y;
@@ -819,7 +838,6 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
 }
 
-/*
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
 void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length) {
