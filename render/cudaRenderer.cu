@@ -720,13 +720,13 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     printf("    > part 1\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
-    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length, 256);
+    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256, 256);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length, 256);
+    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256, 256);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     if (numBlocksPerTile <= 32) {
