@@ -613,6 +613,51 @@ scan_block(int* ptr, const unsigned int idx) {
     ptr[idx] = val;
 }
 
+__device__ void
+scan_block_test(int* ptr, const unsigned int idx, tileIndex) {
+    const unsigned int lane = idx % 32;
+    const unsigned int warp_id = idx >> 5;
+
+    if (tileIndex ==  2080) {
+        printf("warp %d lane %d (%d) = %d\n", warp_id, lane, idx, ptr[idx]);
+    }
+    __syncthreads();
+
+    int val = scan_warp(ptr, idx);
+
+    if (tileIndex ==  2080) {
+        printf("AFTER warp %d lane %d (%d) = %d / %d\n", warp_id, lane, idx, ptr[idx], val);
+    }
+    __syncthreads();
+
+    if (lane == 31)
+        ptr[warp_id] = ptr[idx];
+    __syncthreads();
+    if ((tileIndex ==  2080) && (warp_id == 0)) {
+        printf("ENDPOINTS warp %d lane %d (%d) = %d\n", warp_id, lane, idx, ptr[idx]);
+    }
+    __syncthreads();
+
+    if (warp_id == 0)
+        scan_warp(ptr, idx);
+    __syncthreads();
+    if ((tileIndex ==  2080) && (warp_id == 0)) {
+        printf("ENDPOINTS warp %d lane %d (%d) = %d\n", warp_id, lane, idx, ptr[idx]);
+    }
+    __syncthreads();
+
+    if (warp_id > 0)
+        val = val + ptr[warp_id-1];
+    __syncthreads();
+
+    if (tileIndex ==  2080) {
+        printf("warp %d lane %d (%d) = %d\n", warp_id, lane, idx, val);
+    }
+    __syncthreads();
+
+    ptr[idx] = val;
+}
+
 __global__ void
 kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
@@ -635,7 +680,7 @@ kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * length;
 
-    scan_block(deviceArr + baseOffset, threadIdx.x);
+    scan_block_test(deviceArr + baseOffset, threadIdx.x, tileIndex);
 }
 
 void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
