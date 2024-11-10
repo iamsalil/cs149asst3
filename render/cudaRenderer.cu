@@ -649,6 +649,7 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
             ptr[idx] = tmp1 + tmp2;
             __syncwarp();
         }
+        __syncwarp();
         if ((tileIndex == 2080) && (lane == 0)) {
             printf("[");
             for (int j = 0; j < 32; j++) {
