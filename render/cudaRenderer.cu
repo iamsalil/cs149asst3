@@ -645,10 +645,13 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
         if (lane >= shift) {
             int tmp1 = ptr[idx - shift];
             int tmp2 = ptr[idx];
-            __syncwarp();
             if (tileIndex == 2080)
                 printf("%d + %d --> %d (%d + %d --> %d)\n", idx, idx-shift, idx, tmp1, tmp2, tmp1+tmp2);
+            __syncwarp();
             ptr[idx] = tmp1 + tmp2;
+            __syncwarp();
+            if (tileIndex == 2080)
+                printf("%d = %d", idx, ptr[idx]);
             __syncwarp();
         }
         __syncwarp();
