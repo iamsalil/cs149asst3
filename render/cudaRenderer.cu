@@ -576,6 +576,15 @@ kernelPrintArr(int* arr, int idx, int N) {
     printf("]\n");
 }
 
+__global__ void
+kernelPrintArrV2(int* arr, int idx, int N) {
+    printf("  > [");
+    for (int i = 0; i < N; i++) {
+        printf("%d ", (arr+idx)[i]);
+    }
+    printf("]\n");
+}
+
 __device__ int
 scan_warp(int* ptr, const unsigned int idx) {
     const unsigned int lane = idx % 32;
@@ -708,13 +717,13 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     printf("    > part 1\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
-    kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
+    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length, 256);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
+    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length, 256);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     if (numBlocksPerTile <= 32) {
