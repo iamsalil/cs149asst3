@@ -1260,6 +1260,10 @@ CudaRenderer::render() {
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         printf("> find updates time: %fms\n", 1000*(endTime - startTime));
+        kernelPrintArrV2(tileCircleUpdates, 2080*circleSpaceAllocated, circleSpaceAllocated);
+        cudaDeviceSynchronize();
+        kernelPrintArrV2(tileNumCircles, 2080, 1);
+        cudaDeviceSynchronize();
 
         // (4) Update pixels
         startTime = CycleTimer::currentSeconds();
