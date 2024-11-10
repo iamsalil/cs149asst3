@@ -690,9 +690,11 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
+    cudaDeviceSynchronize();
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     cudaDeviceSynchronize();
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
+    cudaDeviceSynchronize();
     if (numBlocksPerTile <= 32) {
         // Part 2 - Add blocks together
         printf("    > part 2\n");
