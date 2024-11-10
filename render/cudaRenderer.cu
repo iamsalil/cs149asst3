@@ -597,6 +597,7 @@ scan_block(int* ptr, const unsigned int idx) {
     const unsigned int warp_id = idx >> 5;
 
     int val = scan_warp(ptr, idx);
+    __syncthreads();
 
     if (lane == 31)
         ptr[warp_id] = ptr[idx];
@@ -680,7 +681,8 @@ kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * length;
 
-    scan_block_test(deviceArr + baseOffset, threadIdx.x, tileIndex);
+    // scan_block_test(deviceArr + baseOffset, threadIdx.x, tileIndex);
+    scan_block(deviceArr + baseOffset, threadIdx.x);
 }
 
 void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
