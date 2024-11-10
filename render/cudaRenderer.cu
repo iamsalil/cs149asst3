@@ -691,6 +691,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     dim3 gridDim(numBlocksPerTile, width, height);
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    cudaDeviceSynchronize();
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     if (numBlocksPerTile <= 32) {
         // Part 2 - Add blocks together
@@ -701,11 +702,13 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
         multiExclusiveScan_SingleWarp(deviceArr, width, height, 32);
+        cudaDeviceSynchronize();
         // Part 3 - Add results back in
         printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32);
+        cudaDeviceSynchronize();
         cudaFree(tempData);
     } else {
         // Part 2 - Add blocks together
@@ -715,12 +718,14 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
+        cudaDeviceSynchronize();
         multiExclusiveScan_SingleBlock(deviceArr, width, height, 256);
         // Part 3 - Add results back in
         printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256);
+        cudaDeviceSynchronize();
         cudaFree(tempData);
     }
 }
