@@ -754,6 +754,11 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32);
         cudaDeviceSynchronize();
+        for (int i = 0; i < numBlocksPerTile; i++) {
+            printf("block %d: ", i);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+            cudaDeviceSynchronize();
+        }
         cudaFree(tempData);
     } else {
         // Part 2 (256) - Add blocks together
