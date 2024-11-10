@@ -1166,6 +1166,10 @@ CudaRenderer::render() {
 void
 CudaRenderer::render() {
     printf("Rendering image\n");
+    double startTime;
+    double endTime;
+    dim3 blockDim;
+    dim3 gridDim;
     // s = index of first circle rendering this iteration
     // e = index of first circle not rendering this iteration
     for (int s = 0; s < numCircles; s += 256*256-1) {
@@ -1199,7 +1203,7 @@ CudaRenderer::render() {
         startTime = CycleTimer::currentSeconds();
         blockDim = dim3(256, 1, 1);
         gridDim = dim3((numCirclesRendering + 255)/256, nWidthTiles, nHeightTiles);
-        kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, circleSpaceAllocated, s, e);
+        kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, tileNumCircles, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         printf("time: %fms\n", 1000*(endTime - startTime));
