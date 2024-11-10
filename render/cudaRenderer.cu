@@ -724,7 +724,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         printf("block %d: ", i);
         kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
     }
-    cudaDeviceSynchronize()
+    cudaDeviceSynchronize();
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -732,7 +732,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         printf("block %d: ", i);
         kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
     }
-    cudaDeviceSynchronize()
+    cudaDeviceSynchronize();
     if (numBlocksPerTile <= 32) {
         // Part 2 (32) - Add blocks together
         printf("    > part 2\n");
