@@ -1171,7 +1171,7 @@ CudaRenderer::render() {
     for (int s = 0; s < numCircles; s += 256*256-1) {
         int e = (s + 256*256-1 < numCircles) ? s + 256*256-1 : numCircles;
         int numCirclesRendering = e - s;
-        printf("rendering %d circles (%d -> %d)", numCirclesRendering, s, e);
+        printf("rendering %d circles (%d -> %d)\n", numCirclesRendering, s, e);
 
         /*
         // (1) Tile x circle intersection
