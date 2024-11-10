@@ -542,17 +542,6 @@ __global__ void kernelRenderCircles() {
   //////////////////
  // MY FUNCTIONS //
 //////////////////
-static inline int nextPow2(int n) {
-    n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    n++;
-    return n;
-}
-
 #include "circleBoxTest.cu_inl"
 __global__ void
 kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e) {
@@ -628,10 +617,7 @@ __global__ void
 kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * length;
-    if (tileIndex == 2080) {
-        printf("    > %d %d\n", tileIndex, baseOffset);
-        printf("      > %d\n", threadIdx.x);
-    }
+
     deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x);
 }
 
@@ -656,7 +642,9 @@ void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int l
     printf("  > single block exclusive scan\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(1, width, height);
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, 256);
     kernelMultiExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    kernelPrintArr<<<1, 1>>>(deviceArr, 2080, 256);
 }
 
 __global__ void
