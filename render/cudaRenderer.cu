@@ -1173,7 +1173,6 @@ CudaRenderer::render() {
         int numCirclesRendering = e - s;
         printf("rendering %d circles (%d -> %d)\n", numCirclesRendering, s, e);
 
-        /*
         // (1) Tile x circle intersection
         startTime = CycleTimer::currentSeconds();
         blockDim = dim3(256, 1, 1);
@@ -1217,6 +1216,5 @@ CudaRenderer::render() {
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         printf("time: %fms\n", 1000*(endTime - startTime));
-        */
     }
 }
