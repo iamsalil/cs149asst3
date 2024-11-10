@@ -680,7 +680,7 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int tempDataL
     */
     int val = scan_block(deviceArr + baseOffset, threadIdx.x);
     if (threadIdx.x == 255) {
-        printf("block %d final inclusive scan value %d\n", blockIdx.x)
+        printf("block %d final inclusive scan value %d\n", blockIdx.x);
         tempData[tileIndex*tempDataLength + blockIdx.x] = val;
     }
     __syncthreads();
