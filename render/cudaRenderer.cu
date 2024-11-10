@@ -660,7 +660,7 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
     int baseOffset = tileIndex * length + blockInTileOffset;
     __syncthreads();
     /*
-    if ((tileIndex == 2080) && (blockIdx.x == 0)) {
+    if ((tileIndex == 2012) && (blockIdx.x == 0)) {
         printf("block %d: [", blockIdx.x);
         for (int i = 0; i < 256; i++) {
             printf("%d ", deviceArr[baseOffset + blockIdx.x]);
@@ -672,7 +672,7 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
     scan_block(deviceArr + baseOffset, threadIdx.x);
     __syncthreads();
     /*
-    if ((tileIndex == 2080) && (blockIdx.x == 0)) {
+    if ((tileIndex == 2012) && (blockIdx.x == 0)) {
         printf("block %d: [", blockIdx.x);
         for (int i = 0; i < 256; i++) {
             printf("%d ", deviceArr[baseOffset + blockIdx.x]);
@@ -722,7 +722,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     dim3 gridDim(numBlocksPerTile, width, height);
     for (int i = 0; i < numBlocksPerTile; i++) {
         printf("block %d: ", i);
-        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
         cudaDeviceSynchronize();
     }
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
@@ -730,7 +730,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     gpuErrchk(cudaDeviceSynchronize());
     for (int i = 0; i < numBlocksPerTile; i++) {
         printf("block %d: ", i);
-        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
         cudaDeviceSynchronize();
     }
     if (numBlocksPerTile <= 32) {
@@ -742,11 +742,11 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
         cudaDeviceSynchronize();
-        kernelPrintArrV2<<<1, 1>>>(tempData, 2080*32, 32);
+        kernelPrintArrV2<<<1, 1>>>(tempData, 2012*32, 32);
         cudaDeviceSynchronize();
         multiExclusiveScan_SingleWarp(tempData, width, height, 32);
         cudaDeviceSynchronize();
-        kernelPrintArrV2<<<1, 1>>>(tempData, 2080*32, 32);
+        kernelPrintArrV2<<<1, 1>>>(tempData, 2012*32, 32);
         cudaDeviceSynchronize();
         // Part 3 (32) - Add results back in
         printf("    > part 3\n");
@@ -756,7 +756,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         cudaDeviceSynchronize();
         for (int i = 0; i < numBlocksPerTile; i++) {
             printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
             cudaDeviceSynchronize();
         }
         cudaFree(tempData);
@@ -821,7 +821,7 @@ kernelMultiExclusiveScanDownsweep(int N, int twoD, int twoDPlus1, int* arr) {
 }
 
 void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
-    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2012, length);
 
     double startTime;
     double endTime;
@@ -866,13 +866,13 @@ void multiExclusiveScan(int* deviceArr, int width, int height, int length) {
     endTime = CycleTimer::currentSeconds();
     printf("  time: %fms\n", 1000*(endTime - startTime));
 
-    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2012, length);
 }
 
 #include <thrust/scan.h>
 #include <thrust/device_ptr.h>
 void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length) {
-    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2012, length);
     thrust::device_ptr<int> d_ptr(deviceArr);
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -880,7 +880,7 @@ void multiExclusiveScanThrust(int* deviceArr, int width, int height, int length)
             d_ptr += length;
         }
     }
-    // kernelPrintArr<<<1, 1>>>(deviceArr, 2080, length);
+    // kernelPrintArr<<<1, 1>>>(deviceArr, 2012, length);
 }
 */
 
@@ -1260,9 +1260,9 @@ CudaRenderer::render() {
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         printf("> find updates time: %fms\n", 1000*(endTime - startTime));
-        kernelPrintArrV2<<<1, 1>>>(tileCircleUpdates, 2080*circleSpaceAllocated, circleSpaceAllocated);
+        kernelPrintArrV2<<<1, 1>>>(tileCircleUpdates, 2012*circleSpaceAllocated, circleSpaceAllocated);
         cudaDeviceSynchronize();
-        kernelPrintArrV2<<<1, 1>>>(tileNumCircles, 2080, 1);
+        kernelPrintArrV2<<<1, 1>>>(tileNumCircles, 2012, 1);
         cudaDeviceSynchronize();
 
         // (4) Update pixels
