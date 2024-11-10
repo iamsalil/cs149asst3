@@ -655,7 +655,6 @@ void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int l
 
 __global__ void
 kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
-    printf("hi\n");
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int blockInTileOffset = blockIdx.x * blockDim.x;
     int baseOffset = tileIndex * length + blockInTileOffset;
