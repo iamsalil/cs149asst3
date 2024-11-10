@@ -603,7 +603,7 @@ scan_warp(int* ptr, const unsigned int idx) {
     return (lane > 0) ? ptr[idx-1] : 0;
 }
 
-__device__ void
+__device__ int
 scan_block(int* ptr, const unsigned int idx) {
     const unsigned int lane = idx % 32;
     const unsigned int warp_id = idx >> 5;
