@@ -720,26 +720,33 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     printf("    > part 1\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
-    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256, 256);
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
+    for (int i = 0; i < numBlocksPerTile; i++) {
+        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+    }
+    cudaDeviceSynchronize()
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256, 256);
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
+    for (int i = 0; i < numBlocksPerTile; i++) {
+        kernelPrintArrV2<<<1, 1>>>(deviceArr, 2080*length+256*i, 256);
+    }
+    cudaDeviceSynchronize()
     if (numBlocksPerTile <= 32) {
-        // Part 2 - Add blocks together
+        // Part 2 (32) - Add blocks together
         printf("    > part 2\n");
         int* tempData = NULL;
         cudaMalloc(&tempData, sizeof(int) * width * height * 32);
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
+        cudaDeviceSynchronize();
+        kernelPrintArrV2<<<1, 1>>>(tempData, 2080*32, 32);
+        cudaDeviceSynchronize();
         multiExclusiveScan_SingleWarp(deviceArr, width, height, 32);
         cudaDeviceSynchronize();
-        // Part 3 - Add results back in
+        kernelPrintArrV2<<<1, 1>>>(tempData, 2080*32, 32);
+        cudaDeviceSynchronize();
+        // Part 3 (32) - Add results back in
         printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
@@ -747,7 +754,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         cudaDeviceSynchronize();
         cudaFree(tempData);
     } else {
-        // Part 2 - Add blocks together
+        // Part 2 (256) - Add blocks together
         printf("    > part 2\n");
         int* tempData = NULL;
         cudaMalloc(&tempData, sizeof(int) * width * height * 256);
@@ -756,7 +763,8 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
         cudaDeviceSynchronize();
         multiExclusiveScan_SingleBlock(deviceArr, width, height, 256);
-        // Part 3 - Add results back in
+        cudaDeviceSynchronize();
+        // Part 3 (256) - Add results back in
         printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
