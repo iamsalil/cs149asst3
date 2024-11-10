@@ -634,7 +634,8 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
     __syncwarp();
     for (int i = 0; i < 5; i++) {
         int shift = 1<<i;
-        if ((tileIndex == 2080) && (lane == 31)) {
+
+        if ((tileIndex == 2080) && (lane == 0)) {
             printf("%d (shift %d): [", i, shift);
             for (int j = 0; j < 32; j++) {
                 printf("%d ", ptr[j]);
@@ -642,29 +643,28 @@ scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
             printf("] =====>\n");
         }
         __syncwarp();
-        if (lane >= shift) {
-            int tmp1 = ptr[idx - shift];
-            int tmp2 = ptr[idx];
-            if (tileIndex == 2080)
-                printf("%d + %d --> %d (%d + %d --> %d)\n", idx, idx-shift, idx, tmp1, tmp2, tmp1+tmp2);
-            __syncwarp();
-            if (tileIndex == 2080)
-                printf("HELLO\n");
-            ptr[idx] = tmp1 + tmp2;
-            if (tileIndex == 2080)
-                printf("BYEBYE\n");
-            __syncwarp();
-            if (tileIndex == 2080)
-                printf("%d = %d\n", idx, ptr[idx]);
-            __syncwarp();
-        }
+
+        int tmp1 = ptr[idx];
+        int tmp2 = lane >= shift ? ptr[idx - shift] : 0;
+
+        if (tileIndex == 2080)
+            printf("%d + %d --> %d (%d + %d --> %d)\n", idx, idx-shift, idx, tmp1, tmp2, tmp1+tmp2);
+
         __syncwarp();
-        if ((tileIndex == 2080) && (lane == 31)) {
-            printf("=====> [");
+
+        if (tileIndex == 2080)
+            printf("HELLO\n");
+        ptr[idx] = tmp1 + tmp2;
+        if (tileIndex == 2080)
+            printf("BYEBYE\n");
+        __syncwarp();
+
+        if ((tileIndex == 2080) && (lane == 0)) {
+            printf("%d (shift %d): [", i, shift);
             for (int j = 0; j < 32; j++) {
                 printf("%d ", ptr[j]);
             }
-            printf("]\n");
+            printf("] =====>\n");
         }
         __syncwarp();
     }
