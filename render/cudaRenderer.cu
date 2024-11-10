@@ -636,6 +636,7 @@ kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
 }
 
 void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
+    printf("  > single warp exclusive scan\n");
     dim3 blockDim(32, 1, 1);
     dim3 gridDim(1, width, height);
     kernelMultiExclusiveScan_SingleWarp<<<gridDim, blockDim>>>(deviceArr, length);
@@ -650,6 +651,7 @@ kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
 }
 
 void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
+    printf("  > single block exclusive scan\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(1, width, height);
     kernelMultiExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
@@ -694,13 +696,16 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
 }
 
 void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int length, int N) {
+    printf("  > multi block exclusive scan\n");
     int numBlocksPerTile = (N + 255)/256;
     // Part 1 - Do blocks independently
+    printf("    > part 1\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(numBlocksPerTile, width, height);
     kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
     if (numBlocksPerTile <= 32) {
         // Part 2 - Add blocks together
+        printf("    > part 2\n");
         int* tempData = NULL;
         cudaMalloc(&tempData, sizeof(int) * width * height * 32);
         blockDim = dim3(16, 16, 1);
@@ -708,12 +713,14 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
         multiExclusiveScan_SingleWarp(deviceArr, width, height, 32);
         // Part 3 - Add results back in
+        printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32);
         cudaFree(tempData);
     } else {
         // Part 2 - Add blocks together
+        printf("    > part 2\n");
         int* tempData = NULL;
         cudaMalloc(&tempData, sizeof(int) * width * height * 256);
         blockDim = dim3(16, 16, 1);
@@ -721,6 +728,7 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
         multiExclusiveScan_SingleBlock(deviceArr, width, height, 256);
         // Part 3 - Add results back in
+        printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256);
@@ -1165,7 +1173,7 @@ CudaRenderer::render() {
 
 void
 CudaRenderer::render() {
-    printf("Rendering image\n");
+    printf("Rendering image %d, %d, %d\n", nWidthTiles, nHeightTiles, circleSpaceAllocated);
     double startTime;
     double endTime;
     dim3 blockDim;
@@ -1184,7 +1192,7 @@ CudaRenderer::render() {
         kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("time: %fms\n", 1000*(endTime - startTime));
+        printf("> intersection time: %fms\n", 1000*(endTime - startTime));
 
         // (2) Exclusive scan
         startTime = CycleTimer::currentSeconds();
@@ -1197,7 +1205,7 @@ CudaRenderer::render() {
         }
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("time: %fms\n", 1000*(endTime - startTime));
+        printf("> exclusive scan time: %fms\n", 1000*(endTime - startTime));
 
         // (3) Which circles to update
         startTime = CycleTimer::currentSeconds();
@@ -1206,7 +1214,7 @@ CudaRenderer::render() {
         kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, tileNumCircles, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("time: %fms\n", 1000*(endTime - startTime));
+        printf("> find updates time: %fms\n", 1000*(endTime - startTime));
 
         // (4) Update pixels
         startTime = CycleTimer::currentSeconds();
@@ -1219,6 +1227,6 @@ CudaRenderer::render() {
         }
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("time: %fms\n", 1000*(endTime - startTime));
+        printf("> pixel update time: %fms\n", 1000*(endTime - startTime));
     }
 }
