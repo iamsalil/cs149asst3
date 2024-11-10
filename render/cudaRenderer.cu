@@ -651,7 +651,7 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
     int baseOffset = tileIndex * length + blockInTileOffset;
     __syncthreads();
     if ((tileIndex == 2080) && (threadIdx.x == 0)) {
-        printf("block %d: [" blockIdx.x);
+        printf("block %d: [", blockIdx.x);
         for (int i = 0; i < 256; i++) {
             printf("%d ", deviceArr[baseOffset + blockIdx.x]);
         }
@@ -661,7 +661,7 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
     scan_block(deviceArr + baseOffset, threadIdx.x);
     __syncthreads();
     if ((tileIndex == 2080) && (threadIdx.x == 0)) {
-        printf("block %d: [" blockIdx.x);
+        printf("block %d: [", blockIdx.x);
         for (int i = 0; i < 256; i++) {
             printf("%d ", deviceArr[baseOffset + blockIdx.x]);
         }
