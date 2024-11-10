@@ -563,6 +563,9 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e)
     if (circleIndex < e) {
         float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
         float rad = cuConstRendererParams.radius[circleIndex];
+        int hit = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
+        if ((hit == 1) && (tileIndex == 2012))
+            printf("circle %d hits in tile %d\n", circleIndex, tileIndex);
         tileCircleIntersect[baseOffset + localCircleIndex] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
     }
 }
@@ -1261,6 +1264,9 @@ CudaRenderer::render() {
         cudaDeviceSynchronize();
         kernelPrintArrV2<<<1, 1>>>(tileNumCircles, 2012, 1);
         cudaDeviceSynchronize();
+
+        // Get true answers
+
 
         // (4) Update pixels
         startTime = CycleTimer::currentSeconds();
