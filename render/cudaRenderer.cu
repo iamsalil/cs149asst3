@@ -646,6 +646,7 @@ void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int l
 
 __global__ void
 kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int length) {
+    printf("hi\n");
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int blockInTileOffset = blockIdx.x * blockDim.x;
     int baseOffset = tileIndex * length + blockInTileOffset;
@@ -700,6 +701,10 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
     deviceArr[baseOffset + threadIdx.x] += tempData[tempOffset + blockIdx.x];
 }
 
+void runtest(dim3 gridDim, dim3 blockDim, int* deviceArr, int length) {
+    kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
+}
+
 void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int length, int N) {
     int numBlocksPerTile = (N + 255)/256;
     printf("  > multi block exclusive scan (%d circles in %d blocks)\n", N, numBlocksPerTile);
@@ -709,7 +714,8 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     dim3 gridDim(numBlocksPerTile, width, height);
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     cudaDeviceSynchronize();
-    kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length);
+    // kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, length));
+    gpuErrchk(runtest(gridDim, blockDim, deviceArr, length));
     cudaDeviceSynchronize();
     kernelPrintArr<<<1, 1>>>(deviceArr, 2080*length, 256);
     cudaDeviceSynchronize();
