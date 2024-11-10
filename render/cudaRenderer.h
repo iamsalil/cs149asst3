@@ -35,6 +35,7 @@ private:
     int* tileCircleIntersect;
     int* tileCircleUpdates;
     int* tileNumCircles;
+    int* tempData;
 
 public:
 

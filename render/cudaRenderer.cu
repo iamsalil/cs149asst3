@@ -713,7 +713,7 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
     deviceArr[baseOffset + threadIdx.x] += tempData[tempOffset + blockIdx.x];
 }
 
-void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int length, int N) {
+void multiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int width, int height, int length, int N) {
     int numBlocksPerTile = (N + 255)/256;
     printf("  > multi block exclusive scan (%d circles in %d blocks)\n", N, numBlocksPerTile);
     // Part 1 - Do blocks independently
@@ -736,8 +736,6 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
     if (numBlocksPerTile <= 32) {
         // Part 2 (32) - Add blocks together
         printf("    > part 2\n");
-        int* tempData = NULL;
-        cudaMalloc(&tempData, sizeof(int) * width * height * 32);
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32, numBlocksPerTile);
@@ -759,12 +757,9 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
             kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
             cudaDeviceSynchronize();
         }
-        cudaFree(tempData);
     } else {
         // Part 2 (256) - Add blocks together
         printf("    > part 2\n");
-        int* tempData = NULL;
-        cudaMalloc(&tempData, sizeof(int) * width * height * 256);
         blockDim = dim3(16, 16, 1);
         gridDim = dim3((width + 15)/16, (height + 15/16), numBlocksPerTile);
         kernelMultiCopyMemory<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256, numBlocksPerTile);
@@ -777,7 +772,6 @@ void multiExclusiveScan_MultiBlock(int* deviceArr, int width, int height, int le
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256);
         cudaDeviceSynchronize();
-        cudaFree(tempData);
     }
 }
 
@@ -985,6 +979,7 @@ CudaRenderer::CudaRenderer() {
     tileCircleIntersect = NULL;
     tileCircleUpdates = NULL;
     tileNumCircles = NULL;
+    tempData = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -1010,6 +1005,7 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(tileCircleIntersect);
         cudaFree(tileCircleUpdates);
         cudaFree(tileNumCircles);
+        cudaFree(tempData);
     }
 }
 
@@ -1095,6 +1091,7 @@ CudaRenderer::setup() {
     cudaMalloc(&tileCircleIntersect, sizeof(int) * nWidthTiles * nHeightTiles * circleSpaceAllocated);
     cudaMalloc(&tileCircleUpdates, sizeof(int) * nWidthTiles * nHeightTiles * circleSpaceAllocated);
     cudaMalloc(&tileNumCircles, sizeof(int) * nWidthTiles * nHeightTiles);
+    cudaMalloc(&tempData, sizeof(int) * nWidthTiles * nHeightTiles * 256);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -1246,7 +1243,7 @@ CudaRenderer::render() {
         } else if (numCirclesRendering <= 256-1) {
             multiExclusiveScan_SingleBlock(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated);
         } else {
-            multiExclusiveScan_MultiBlock(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated, numCirclesRendering);
+            multiExclusiveScan_MultiBlock(tileCircleIntersect, tempData, nWidthTiles, nHeightTiles, circleSpaceAllocated, numCirclesRendering);
         }
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
