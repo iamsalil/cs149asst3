@@ -590,17 +590,14 @@ kernelPrintArr(int* arr, int idx, int N) {
 __device__ int
 scan_warp(int* ptr, const unsigned int idx) {
     const unsigned int lane = idx % 32;
-
     __syncwarp();
     for (int i = 0; i < 5; i++) {
         int shift = 1<<i;
-        if (lane >= shift) {
-            int tmp1 = ptr[idx - shift];
-            int tmp2 = ptr[idx];
-            __syncwarp();
-            ptr[idx] = tmp1 + tmp2;
-            __syncwarp();
-        }
+        int tmp1 = ptr[idx];
+        int tmp2 = lane >= shift ? ptr[idx - shift] : 0;
+        __syncwarp();
+        ptr[idx] = tmp1 + tmp2;
+        __syncwarp();
     }
     return (lane > 0) ? ptr[idx-1] : 0;
 }
@@ -627,50 +624,6 @@ scan_block(int* ptr, const unsigned int idx) {
     ptr[idx] = val;
 }
 
-__device__ int
-scan_warp_test(int* ptr, const unsigned int idx, int tileIndex) {
-    const unsigned int lane = idx % 32;
-
-    __syncwarp();
-    for (int i = 0; i < 5; i++) {
-        int shift = 1<<i;
-
-        if ((tileIndex == 2080) && (lane == 0)) {
-            printf("%d (shift %d): [", i, shift);
-            for (int j = 0; j < 32; j++) {
-                printf("%d ", ptr[j]);
-            }
-            printf("] =====>\n");
-        }
-        __syncwarp();
-
-        int tmp1 = ptr[idx];
-        int tmp2 = lane >= shift ? ptr[idx - shift] : 0;
-
-        if (tileIndex == 2080)
-            printf("%d + %d --> %d (%d + %d --> %d)\n", idx, idx-shift, idx, tmp1, tmp2, tmp1+tmp2);
-
-        __syncwarp();
-
-        if (tileIndex == 2080)
-            printf("HELLO\n");
-        ptr[idx] = tmp1 + tmp2;
-        if (tileIndex == 2080)
-            printf("BYEBYE\n");
-        __syncwarp();
-
-        if ((tileIndex == 2080) && (lane == 0)) {
-            printf("%d (shift %d): [", i, shift);
-            for (int j = 0; j < 32; j++) {
-                printf("%d ", ptr[j]);
-            }
-            printf("] =====>\n");
-        }
-        __syncwarp();
-    }
-    return (lane > 0) ? ptr[idx-1] : 0;
-}
-
 __global__ void
 kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
@@ -679,7 +632,7 @@ kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
         printf("    > %d %d\n", tileIndex, baseOffset);
         printf("      > %d\n", threadIdx.x);
     }
-    deviceArr[baseOffset + threadIdx.x] = scan_warp_test(deviceArr + baseOffset, threadIdx.x, tileIndex);
+    deviceArr[baseOffset + threadIdx.x] = scan_warp(deviceArr + baseOffset, threadIdx.x, tileIndex);
 }
 
 void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
