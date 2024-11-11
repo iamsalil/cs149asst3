@@ -819,7 +819,7 @@ kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles, int N) {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#define TILESIZE 16
+#define TILESIZE 32
 
 CudaRenderer::CudaRenderer() {
     // printf("Constructing renderer\n");
