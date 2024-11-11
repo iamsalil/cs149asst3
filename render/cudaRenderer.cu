@@ -15,6 +15,7 @@
 #include "sceneLoader.h"
 #include "util.h"
 
+#define TILESIZE 32
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
@@ -818,8 +819,6 @@ kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles, int N) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
-
-#define TILESIZE 32
 
 CudaRenderer::CudaRenderer() {
     // printf("Constructing renderer\n");
