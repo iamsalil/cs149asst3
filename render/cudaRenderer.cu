@@ -598,7 +598,7 @@ kernelFindTileCircleIntersectionsV2(int* tileCircleIntersect, int N, int s, int 
         float distX = tileX - p.x;
         float distY = tileY - p.y;
         float dist = distX*distX + distY*distY;
-        int intersect = (dist <= rad*rad + cornerDist) ? 1 : 0;
+        int intersect = (dist <= rad + cornerDist) ? 1 : 0;
         tileCircleIntersect[baseOffset + localCircleIndex] = intersect;
     }
 }
