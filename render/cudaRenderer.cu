@@ -575,12 +575,12 @@ kernelFindTileCircleIntersectionsV2(int* tileCircleIntersect, int N, int s, int 
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
-    float tileX = = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.y)+0.5f)/static_cast<float>(width);
-    float cornerX = = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.y)/static_cast<float>(width);
+    float tileX = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.y)+0.5f)/static_cast<float>(width);
+    float cornerX = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.y)/static_cast<float>(width);
     float cornerDistX = tileX - cornerX;
 
-    float tileY = = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.z)+0.5f)/static_cast<float>(height);
-    float cornerY = = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.z)/static_cast<float>(height);
+    float tileY = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.z)+0.5f)/static_cast<float>(height);
+    float cornerY = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.z)/static_cast<float>(height);
     float cornerDistY = tileY - cornerY;
 
     float cornerDist = cornerDistX*cornerDistX + cornerDistY*cornerDistY;
