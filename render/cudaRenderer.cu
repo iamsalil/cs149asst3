@@ -1105,7 +1105,7 @@ CudaRenderer::render() {
         startTime = CycleTimer::currentSeconds();
         blockDim = dim3(BLOCKSIZE, 1, 1);
         gridDim = dim3((numCirclesRendering + BLOCKSIZE-1)/BLOCKSIZE, nWidthTiles, nHeightTiles);
-        kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
+        kernelFindTileCircleIntersectionsV2<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         // printf("Step 1: %fms\n", 1000*(endTime - startTime));
