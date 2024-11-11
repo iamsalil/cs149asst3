@@ -17,7 +17,7 @@
 
 #define TILESIZE 32
 #define WARPSIZE 32
-#define BLOCKSIZE 1024
+#define BLOCKSIZE 512
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
