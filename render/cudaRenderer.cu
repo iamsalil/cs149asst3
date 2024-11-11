@@ -566,40 +566,7 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e)
     if (circleIndex < e) {
         float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
         float rad = cuConstRendererParams.radius[circleIndex];
-        tileCircleIntersect[baseOffset + localCircleIndex] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
-    }
-}
-
-__global__ void
-kernelFindTileCircleIntersectionsV2(int* tileCircleIntersect, int N, int s, int e) {
-    int width = cuConstRendererParams.imageWidth;
-    int height = cuConstRendererParams.imageHeight;
-
-    float tileX = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.y)+0.5f)/static_cast<float>(width);
-    float cornerX = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.y)/static_cast<float>(width);
-    float cornerDistX = tileX - cornerX;
-
-    float tileY = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.z)+0.5f)/static_cast<float>(height);
-    float cornerY = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.z)/static_cast<float>(height);
-    float cornerDistY = tileY - cornerY;
-
-    float cornerDist = cornerDistX*cornerDistX + cornerDistY*cornerDistY;
-
-    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
-    int baseOffset = tileIndex * N;
-
-    int localCircleIndex = blockIdx.x * blockDim.x + threadIdx.x;
-    int circleIndex = localCircleIndex + s;
-    int circleIndex3 = 3 * circleIndex;
-
-    if (circleIndex < e) {
-        float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
-        float rad = cuConstRendererParams.radius[circleIndex];
-        float distX = tileX - p.x;
-        float distY = tileY - p.y;
-        float dist = distX*distX + distY*distY;
-        int intersect = (dist <= rad + cornerDist) ? 1 : 0;
-        tileCircleIntersect[baseOffset + localCircleIndex] = intersect;
+        tileCircleIntersect[baseOffset + localCircleIndex] = circleInBox(p.x, p.y, rad, tileL, tileR, tileT, tileB);
     }
 }
 
@@ -1105,7 +1072,7 @@ CudaRenderer::render() {
         startTime = CycleTimer::currentSeconds();
         blockDim = dim3(BLOCKSIZE, 1, 1);
         gridDim = dim3((numCirclesRendering + BLOCKSIZE-1)/BLOCKSIZE, nWidthTiles, nHeightTiles);
-        kernelFindTileCircleIntersectionsV2<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
+        kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
         // printf("Step 1: %fms\n", 1000*(endTime - startTime));
