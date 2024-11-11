@@ -17,7 +17,7 @@
 
 #define TILESIZE 32
 #define WARPSIZE 32
-#define BLOCKSIZE 512
+#define BLOCKSIZE 256
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
@@ -566,8 +566,40 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e)
     if (circleIndex < e) {
         float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
         float rad = cuConstRendererParams.radius[circleIndex];
-        int hit = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
         tileCircleIntersect[baseOffset + localCircleIndex] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
+    }
+}
+
+__global__ void
+kernelFindTileCircleIntersectionsV2(int* tileCircleIntersect, int N, int s, int e) {
+    int width = cuConstRendererParams.imageWidth;
+    int height = cuConstRendererParams.imageHeight;
+
+    float tileX = = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.y)+0.5f)/static_cast<float>(width);
+    float cornerX = = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.y)/static_cast<float>(width);
+    float cornerDistX = tileX - cornerX;
+
+    float tileY = = static_cast<float>(TILESIZE)*(static_cast<float>(blockIdx.z)+0.5f)/static_cast<float>(height);
+    float cornerY = = static_cast<float>(TILESIZE)*static_cast<float>(blockIdx.z)/static_cast<float>(height);
+    float cornerDistY = tileY - cornerY;
+
+    float cornerDist = cornerDistX*cornerDistX + cornerDistY*cornerDistY;
+
+    int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
+    int baseOffset = tileIndex * N;
+
+    int localCircleIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    int circleIndex = localCircleIndex + s;
+    int circleIndex3 = 3 * circleIndex;
+
+    if (circleIndex < e) {
+        float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
+        float rad = cuConstRendererParams.radius[circleIndex];
+        float distX = tileX - p.x;
+        float distY = tileY - p.y;
+        float dist = distX*distX + distY*distY;
+        int intersect = (dist <= rad*rad + cornerDist) ? 1 : 0;
+        tileCircleIntersect[baseOffset + localCircleIndex] = intersect;
     }
 }
 
