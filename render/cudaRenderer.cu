@@ -819,6 +819,7 @@ kernelPixelUpdateNotSnow(int* tileCircleUpdates, int* tileNumCircles, int N) {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#define TILESIZE 16
 
 CudaRenderer::CudaRenderer() {
     // printf("Constructing renderer\n");
@@ -1011,8 +1012,8 @@ CudaRenderer::allocOutputImage(int width, int height) {
     image = new Image(width, height);
     myImageWidth = width;
     myImageHeight = height;
-    nWidthTiles = (width + 15)/16;
-    nHeightTiles = (height + 15)/16;
+    nWidthTiles = (width + TILESIZE-1)/TILESIZE;
+    nHeightTiles = (height + TILESIZE-1)/TILESIZE;
 }
 
 // clearImage --
@@ -1120,7 +1121,7 @@ CudaRenderer::render() {
 
         // (4) Update pixels
         startTime = CycleTimer::currentSeconds();
-        blockDim = dim3(16, 16);
+        blockDim = dim3(TILESIZE, TILESIZE);
         gridDim = dim3(nWidthTiles, nHeightTiles);
         if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
             kernelPixelUpdateSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles, circleSpaceAllocated);
