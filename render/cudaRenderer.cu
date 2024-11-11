@@ -564,8 +564,6 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e)
         float3 p = *(float3*)(&cuConstRendererParams.position[circleIndex3]);
         float rad = cuConstRendererParams.radius[circleIndex];
         int hit = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
-        if ((hit == 1) && (tileIndex == 2012))
-            printf("circle %d hits in tile %d\n", circleIndex, tileIndex);
         tileCircleIntersect[baseOffset + localCircleIndex] = circleInBoxConservative(p.x, p.y, rad, tileL, tileR, tileT, tileB);
     }
 }
@@ -641,7 +639,6 @@ kernelMultiExclusiveScan_SingleWarp(int* deviceArr, int length) {
 }
 
 void multiExclusiveScan_SingleWarp(int* deviceArr, int width, int height, int length) {
-    printf("  > single warp exclusive scan\n");
     dim3 blockDim(32, 1, 1);
     dim3 gridDim(1, width, height);
     kernelMultiExclusiveScan_SingleWarp<<<gridDim, blockDim>>>(deviceArr, length);
@@ -656,7 +653,6 @@ kernelMultiExclusiveScan_SingleBlock(int* deviceArr, int length) {
 }
 
 void multiExclusiveScan_SingleBlock(int* deviceArr, int width, int height, int length) {
-    printf("  > single block exclusive scan\n");
     dim3 blockDim(256, 1, 1);
     dim3 gridDim(1, width, height);
     kernelMultiExclusiveScan_SingleBlock<<<gridDim, blockDim>>>(deviceArr, length);
@@ -668,33 +664,11 @@ kernelMultiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int tempDataL
     int blockInTileOffset = blockIdx.x * blockDim.x;
     int baseOffset = tileIndex * length + blockInTileOffset;
     __syncthreads();
-    /*
-    if ((tileIndex == 2012) && (blockIdx.x == 0)) {
-        printf("block %d: [", blockIdx.x);
-        for (int i = 0; i < 256; i++) {
-            printf("%d ", deviceArr[baseOffset + blockIdx.x]);
-        }
-        printf("]\n");
-    }
-    __syncthreads();
-    */
+
     int val = scan_block(deviceArr + baseOffset, threadIdx.x);
-    if (threadIdx.x == 255) {
-        if (tileIndex == 2012)
-            printf("block %d final inclusive scan value %d\n", blockIdx.x, val);
+    if (threadIdx.x == 255)
         tempData[tileIndex*tempDataLength + blockIdx.x] = val;
-    }
     __syncthreads();
-    /*
-    if ((tileIndex == 2012) && (blockIdx.x == 0)) {
-        printf("block %d: [", blockIdx.x);
-        for (int i = 0; i < 256; i++) {
-            printf("%d ", deviceArr[baseOffset + blockIdx.x]);
-        }
-        printf("]\n");
-    }
-    __syncthreads();
-    */
 }
 
 __global__ void
@@ -729,68 +703,34 @@ kernelAddTempData(int* deviceArr, int* tempData, int width, int height, int leng
 
 void multiExclusiveScan_MultiBlock(int* deviceArr, int* tempData, int width, int height, int length, int N) {
     int numBlocksPerTile = (N + 255)/256;
-    printf("  > multi block exclusive scan (%d circles in %d blocks)\n", N, numBlocksPerTile);
     if (numBlocksPerTile <= 32) {
         // Part 1 (32) - Do blocks independently
-        printf("    > part 1\n");
         dim3 blockDim(256, 1, 1);
         dim3 gridDim(numBlocksPerTile, width, height);
-        for (int i = 0; i < numBlocksPerTile; i++) {
-            printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-            cudaDeviceSynchronize();
-        }
         kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, tempData, 32, length);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-        for (int i = 0; i < numBlocksPerTile; i++) {
-            printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-            cudaDeviceSynchronize();
-        }
-        // Part 2 (32) - Add blocks together
-        printf("    > part 2\n");
-        kernelPrintArrV2<<<1, 1>>>(tempData, 2012*32, 32);
         cudaDeviceSynchronize();
+
+        // Part 2 (32) - Add blocks together
         multiExclusiveScan_SingleWarp(tempData, width, height, 32);
         cudaDeviceSynchronize();
-        kernelPrintArrV2<<<1, 1>>>(tempData, 2012*32, 32);
-        cudaDeviceSynchronize();
+
         // Part 3 (32) - Add results back in
-        printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 32);
         cudaDeviceSynchronize();
-        for (int i = 0; i < numBlocksPerTile; i++) {
-            printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-            cudaDeviceSynchronize();
-        }
     } else {
         // Part 1 (256) - Do blocks independently
-        printf("    > part 1\n");
         dim3 blockDim(256, 1, 1);
         dim3 gridDim(numBlocksPerTile, width, height);
-        for (int i = 0; i < numBlocksPerTile; i++) {
-            printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-            cudaDeviceSynchronize();
-        }
         kernelMultiExclusiveScan_MultiBlock<<<gridDim, blockDim>>>(deviceArr, tempData, 256, length);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-        for (int i = 0; i < numBlocksPerTile; i++) {
-            printf("block %d: ", i);
-            kernelPrintArrV2<<<1, 1>>>(deviceArr, 2012*length+256*i, 256);
-            cudaDeviceSynchronize();
-        }
+        cudaDeviceSynchronize();
+
         // Part 2 (256) - Add blocks together
-        printf("    > part 2\n");
         multiExclusiveScan_SingleBlock(tempData, width, height, 256);
         cudaDeviceSynchronize();
+
         // Part 3 (256) - Add results back in
-        printf("    > part 3\n");
         blockDim = dim3(256, 1, 1);
         gridDim = dim3(numBlocksPerTile, width, height);
         kernelAddTempData<<<gridDim, blockDim>>>(deviceArr, tempData, width, height, length, 256);
@@ -1238,9 +1178,7 @@ CudaRenderer::render() {
 
 void
 CudaRenderer::render() {
-    printf("Rendering image %d, %d, %d\n", nWidthTiles, nHeightTiles, circleSpaceAllocated);
-    double startTime;
-    double endTime;
+    // printf("Rendering image %d, %d, %d\n", nWidthTiles, nHeightTiles, circleSpaceAllocated);
     dim3 blockDim;
     dim3 gridDim;
     // s = index of first circle rendering this iteration
@@ -1248,19 +1186,15 @@ CudaRenderer::render() {
     for (int s = 0; s < numCircles; s += 256*256-1) {
         int e = (s + 256*256-1 < numCircles) ? s + 256*256-1 : numCircles;
         int numCirclesRendering = e - s;
-        printf("rendering %d circles (%d -> %d)\n", numCirclesRendering, s, e);
+        // printf("rendering %d circles (%d -> %d)\n", numCirclesRendering, s, e);
 
         // (1) Tile x circle intersection
-        startTime = CycleTimer::currentSeconds();
         blockDim = dim3(256, 1, 1);
         gridDim = dim3((numCirclesRendering + 255)/256, nWidthTiles, nHeightTiles);
         kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
-        endTime = CycleTimer::currentSeconds();
-        printf("> intersection time: %fms\n", 1000*(endTime - startTime));
 
         // (2) Exclusive scan
-        startTime = CycleTimer::currentSeconds();
         if (numCirclesRendering <= 32-1) {
             multiExclusiveScan_SingleWarp(tileCircleIntersect, nWidthTiles, nHeightTiles, circleSpaceAllocated);
         } else if (numCirclesRendering <= 256-1) {
@@ -1269,27 +1203,14 @@ CudaRenderer::render() {
             multiExclusiveScan_MultiBlock(tileCircleIntersect, tempData, nWidthTiles, nHeightTiles, circleSpaceAllocated, numCirclesRendering);
         }
         cudaDeviceSynchronize();
-        endTime = CycleTimer::currentSeconds();
-        printf("> exclusive scan time: %fms\n", 1000*(endTime - startTime));
 
         // (3) Which circles to update
-        startTime = CycleTimer::currentSeconds();
         blockDim = dim3(256, 1, 1);
         gridDim = dim3((numCirclesRendering + 255)/256, nWidthTiles, nHeightTiles);
         kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, tileNumCircles, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
-        endTime = CycleTimer::currentSeconds();
-        printf("> find updates time: %fms\n", 1000*(endTime - startTime));
-        kernelPrintArrV2<<<1, 1>>>(tileCircleUpdates, 2012*circleSpaceAllocated, circleSpaceAllocated);
-        cudaDeviceSynchronize();
-        kernelPrintArrV2<<<1, 1>>>(tileNumCircles, 2012, 1);
-        cudaDeviceSynchronize();
-
-        // Get true answers
-
 
         // (4) Update pixels
-        startTime = CycleTimer::currentSeconds();
         blockDim = dim3(16, 16);
         gridDim = dim3(nWidthTiles, nHeightTiles);
         if (sceneName == SNOWFLAKES || sceneName == SNOWFLAKES_SINGLE_FRAME) {
@@ -1298,7 +1219,5 @@ CudaRenderer::render() {
             kernelPixelUpdateNotSnow<<<gridDim, blockDim>>>(tileCircleUpdates, tileNumCircles, circleSpaceAllocated);
         }
         cudaDeviceSynchronize();
-        endTime = CycleTimer::currentSeconds();
-        printf("> pixel update time: %fms\n", 1000*(endTime - startTime));
     }
 }
