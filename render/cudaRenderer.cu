@@ -548,10 +548,10 @@ kernelFindTileCircleIntersections(int* tileCircleIntersect, int N, int s, int e)
     int width = cuConstRendererParams.imageWidth;
     int height = cuConstRendererParams.imageHeight;
 
-    float tileL = static_cast<float>(blockIdx.y*16) / static_cast<float>(width);
-    float tileR = fminf(1.f, static_cast<float>((blockIdx.y+1)*16) / static_cast<float>(width));
-    float tileB = static_cast<float>(blockIdx.z*16) / static_cast<float>(height);
-    float tileT = fminf(1.f, static_cast<float>((blockIdx.z+1)*16) / static_cast<float>(height));
+    float tileL = static_cast<float>(blockIdx.y*TILESIZE) / static_cast<float>(width);
+    float tileR = fminf(1.f, static_cast<float>((blockIdx.y+1)*TILESIZE) / static_cast<float>(width));
+    float tileB = static_cast<float>(blockIdx.z*TILESIZE) / static_cast<float>(height);
+    float tileT = fminf(1.f, static_cast<float>((blockIdx.z+1)*TILESIZE) / static_cast<float>(height));
 
     int tileIndex = blockIdx.z * gridDim.y + blockIdx.y;
     int baseOffset = tileIndex * N;
