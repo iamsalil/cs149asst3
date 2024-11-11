@@ -1094,7 +1094,7 @@ CudaRenderer::render() {
         kernelFindTileCircleIntersections<<<gridDim, blockDim>>>(tileCircleIntersect, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("Step 1: %fms\n", 1000*(endTime - startTime));
+        // printf("Step 1: %fms\n", 1000*(endTime - startTime));
 
         // (2) Exclusive scan
         startTime = CycleTimer::currentSeconds();
@@ -1107,7 +1107,7 @@ CudaRenderer::render() {
         }
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("Step 2: %fms\n", 1000*(endTime - startTime));
+        // printf("Step 2: %fms\n", 1000*(endTime - startTime));
 
         // (3) Which circles to update
         startTime = CycleTimer::currentSeconds();
@@ -1116,7 +1116,7 @@ CudaRenderer::render() {
         kernelMultiFindStepLocs<<<gridDim, blockDim>>>(tileCircleIntersect, tileCircleUpdates, tileNumCircles, circleSpaceAllocated, s, e);
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("Step 3: %fms\n", 1000*(endTime - startTime));
+        // printf("Step 3: %fms\n", 1000*(endTime - startTime));
 
         // (4) Update pixels
         startTime = CycleTimer::currentSeconds();
@@ -1129,6 +1129,6 @@ CudaRenderer::render() {
         }
         cudaDeviceSynchronize();
         endTime = CycleTimer::currentSeconds();
-        printf("Step 4: %fms\n", 1000*(endTime - startTime));
+        // printf("Step 4: %fms\n", 1000*(endTime - startTime));
     }
 }
